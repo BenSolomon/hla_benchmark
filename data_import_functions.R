@@ -149,7 +149,10 @@ format_hla_table <- function(hla_table){
     separate(allele, into = c("locus", "fields"), sep = "\\*", 
              fill = "right", extra = "drop") %>% 
     separate(fields, into = c("field_1", "field_2", "field_3"), sep = ":", 
-             fill = "right", extra = "drop")
+             fill = "right", extra = "drop") %>% 
+    mutate(field_2 = paste(field_1, field_2, sep = "_"), 
+           field_3 = paste(field_2, field_3, sep = "_")) %>% 
+    mutate_at(vars(field_1:field_3), function(x) ifelse(grepl("NA",x),NA,x))
 }
 # format_hla_table(combine_HLA_import(path = isb_path, samples = isb_samples))
 
