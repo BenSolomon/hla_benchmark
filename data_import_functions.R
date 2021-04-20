@@ -21,7 +21,7 @@ invitro_import()
 
 ### Run arcasHLA merge
 # Refreshes the genotypes.tsv file created by arcasHLA merge
-arcasHLA_merge <- function(path="/labs/khatrilab/solomonb/covid/isb/arcasHLA/DRB4_rerun"){
+arcasHLA_merge <- function(path="/labs/khatrilab/solomonb/covid/isb/arcasHLA"){
   command <- sprintf(
     "source /labs/khatrilab/solomonb/miniconda3/etc/profile.d/conda.sh;
     conda activate samtools;
@@ -39,7 +39,7 @@ arcas_import <- function(path, call_merge=F){
   if(call_merge==T){
     arcasHLA_merge()
   }
-  read_tsv(sprintf("%s/DRB4_rerun/genotypes.tsv", path)) %>% 
+  read_tsv(sprintf("%s/genotypes.tsv", path)) %>% 
     pivot_longer(-subject, names_to = "allele_id", values_to = "allele") %>% 
     mutate(allele_id = str_sub(allele_id, -1),
            genotyper = "arcasHLA") %>% 
