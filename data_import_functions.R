@@ -140,4 +140,16 @@ combine_HLA_import <- function(path, samples){
   })
 }
 
-x <- combine_HLA_import(path = isb_path, samples = isb_samples)
+# x <- combine_HLA_import(path = isb_path, samples = isb_samples)
+
+
+# Format HLA table
+format_hla_table <- function(hla_table){
+  hla_table %>% 
+    separate(allele, into = c("locus", "fields"), sep = "\\*", 
+             fill = "right", extra = "drop") %>% 
+    separate(fields, into = c("field_1", "field_2", "field_3"), sep = ":", 
+             fill = "right", extra = "drop")
+}
+# format_hla_table(combine_HLA_import(path = isb_path, samples = isb_samples))
+

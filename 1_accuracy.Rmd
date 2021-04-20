@@ -1,0 +1,22 @@
+---
+title: "1) Genotyping Accuracy"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+source("data_import_functions.R")
+isb_path <- "/labs/khatrilab/solomonb/covid/isb"
+isb_samples <- read_tsv("/labs/khatrilab/solomonb/covid/isb/logs/210217_232725/parallel.log") %>% 
+  separate(Command, into = c(NA, "sample"), sep = " ") %>% 
+  pull(sample) %>% unique()
+```
+
+```{r}
+all_hla <- format_hla_table(combine_HLA_import(path = isb_path, samples = isb_samples))
+
+all_samples <- read_tsv(sprintf("%s/all_samples.txt", isb_path), col_names = "sample") %>% pull(sample)
+typed_hla <- all_hla %>% 
+  filter(grepl("^[ABCD]", locus), sample %in% all_samples)
+```
+
