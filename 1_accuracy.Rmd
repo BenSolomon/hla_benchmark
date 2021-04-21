@@ -58,14 +58,52 @@ prediction_frequency %>%
 # Accuracy
 
 ```{r}
-hla_compare_woNA <- compare_hla(hla_df = all_hla, reference = "invitro", exclude_missing = T, compare_function = "accuracy")
+hla_compare_woNA <- compare_hla(hla_df = all_hla, reference = "invitro", exclude_missing = F, compare_function = "accuracy")
 ```
 
 ```{r}
-hla_compare_woNA %>% 
+p1 <- hla_compare_woNA %>% 
   filter(grepl("^[ABC]", locus)) %>% 
   gg_accuracy() +
   ggtitle("MHC1 loci accuracy", subtitle = "Missing predictions excluded")
 ```
 
+# Updating molecular HLA typing across timepoints
+
+```{r}
+all_hla
+```
+```{r}
+### Every subject has molecular HLA typing, but may occur in the BL, AC, or CV timepoint
+### This expands the molecular HLA typing from the timepoint it occurs to all other time points 
+### This allows for scRNA genotyping from a given subject and timepoint to be assessed even if that
+### subjects molecular typing happened at a different time point. Since HLA is genetic, the molecular
+### typing should not change
+
+all_hla_expanded <- all_hla %>% 
+  group_by(sample, genotyper) %>% 
+  nest() %>% 
+  filter(genotyper == "invitro") %>% 
+  separate(sample, into = c("sample",NA), sep = "-") %>% 
+  right_join(all_hla %>% 
+               select(sample) %>% 
+               distinct() %>% 
+               separate(sample, into = c("sample","time"), sep = "-"),
+             by = "sample") %>% 
+  unnest(data) %>% 
+  unite(sample, sample, time, sep = "-") %>% 
+  bind_rows(all_hla %>% filter(genotyper != "invitro"))
+```
+
+```{r}
+p2 <- compare_hla(hla_df = all_hla_expanded %>% filter(grepl("BL$", sample)), reference = "invitro", exclude_missing = F, compare_function = "accuracy") %>% 
+  filter(grepl("^[ABC]", locus)) %>% 
+  gg_accuracy() +
+  ggtitle("MHC1 loci accuracy", subtitle = "Missing predictions excluded")
+```
+
+```{r, fig.height = 6, fig.width = 12}
+library(patchwork)
+p1/p2
+```
 

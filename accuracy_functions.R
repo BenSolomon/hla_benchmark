@@ -62,7 +62,6 @@ compare_hla<- function(hla_df, reference = "invitro", exclude_missing=T, compare
   
   # Function
   df <- hla_df %>%
-    mutate(field_2 = paste(field_1, field_2, sep = "_"), field_3 = paste(field_2, field_3, sep = "_")) %>%
     select(-allele_id) %>%
     group_by(sample, locus, genotyper) %>%
     summarise_all(list) %>%
