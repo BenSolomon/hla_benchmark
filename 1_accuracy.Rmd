@@ -3,8 +3,10 @@ title: "1) Genotyping Accuracy"
 output: html_notebook
 ---
 
-```{r}
+# Setup 
+```{r, message=F}
 library(tidyverse)
+library(ggh4x)
 source("data_import_functions.R")
 isb_path <- "/labs/khatrilab/solomonb/covid/isb"
 isb_samples <- read_tsv("/labs/khatrilab/solomonb/covid/isb/logs/210217_232725/parallel.log") %>% 
@@ -13,10 +15,57 @@ isb_samples <- read_tsv("/labs/khatrilab/solomonb/covid/isb/logs/210217_232725/p
 ```
 
 ```{r}
-all_hla <- format_hla_table(combine_HLA_import(path = isb_path, samples = isb_samples))
+all_hla <- format_hla_table(combine_HLA_import(path = isb_path, samples = isb_samples)) %>% filter(sample %in% isb_samples)
 
-all_samples <- read_tsv(sprintf("%s/all_samples.txt", isb_path), col_names = "sample") %>% pull(sample)
-typed_hla <- all_hla %>% 
-  filter(grepl("^[ABCD]", locus), sample %in% all_samples)
+# all_samples <- read_tsv(sprintf("%s/all_samples.txt", isb_path), col_names = "sample") %>% pull(sample)
+# typed_hla <- all_hla %>% 
+#   filter(grepl("^[ABCD]", locus), sample %in% all_samples)
 ```
+# Prediction frequency
+
+```{r}
+prediction_frequency <- all_hla %>% 
+  select(-allele_id) %>% 
+  pivot_longer(cols = field_1:field_3, names_to = "field", values_to = "allele") %>% 
+  pivot_wider(names_from = "genotyper", values_from = "allele", values_fn = function(x) sum(!is.na(x)), values_fill = 0) %>% 
+  # filter(invitro != 0) %>% 
+  ### NEED TO DEAL WITH HLAMINER AMBIGOUS ALLELES
+  # mutate_at(vars(arcasHLA:hlaminer), funs(./invitro)) %>% 
+  mutate_at(vars(arcasHLA:hlaminer), funs(./2)) %>% 
+  select(-invitro) %>% 
+  ungroup() %>% 
+  pivot_longer(cols = arcasHLA:hlaminer, names_to = "genotyper", values_to = "frequency")
+
+```
+
+
+```{r, fig.width = 18, fig.height = 4}
+prediction_frequency %>% 
+  mutate(genotyper = fct_relevel(genotyper, "optitype", "arcasHLA", "phlat")) %>% 
+  filter(grepl("^[D][PQR]", locus) & genotyper %in% c("arcasHLA", "hlaminer"),) %>% 
+  ggplot(aes(x = field, y = frequency))+
+  stat_summary(fun = mean, geom = "point", position = position_dodge(width=0.9)) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", position=position_dodge(width=0.9)) +
+  theme_bw() +
+  facet_nested(.~locus+genotyper, scales = "free_y") +
+  coord_cartesian(ylim = c(0,1))+
+  scale_y_continuous(n.breaks = 6)+
+  labs(y = "Rate of allele prediction", x = "")+
+  theme(axis.text.x = element_text(angle = 90))+
+  theme(panel.spacing = unit(0.2,"line"))
+```
+
+# Accuracy
+
+```{r}
+hla_compare_woNA <- compare_hla(hla_df = all_hla, reference = "invitro", exclude_missing = T, compare_function = "accuracy")
+```
+
+```{r}
+hla_compare_woNA %>% 
+  filter(grepl("^[ABC]", locus)) %>% 
+  gg_accuracy() +
+  ggtitle("MHC1 loci accuracy", subtitle = "Missing predictions excluded")
+```
+
 
