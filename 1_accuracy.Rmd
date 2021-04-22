@@ -7,6 +7,7 @@ output: html_notebook
 ```{r, message=F}
 library(tidyverse)
 library(ggh4x)
+library(patchwork)
 source("data_import_functions.R")
 isb_path <- "/labs/khatrilab/solomonb/covid/isb"
 isb_samples <- read_tsv("/labs/khatrilab/solomonb/covid/isb/logs/210217_232725/parallel.log") %>% 
@@ -21,7 +22,9 @@ all_hla <- format_hla_table(combine_HLA_import(path = isb_path, samples = isb_sa
 # typed_hla <- all_hla %>% 
 #   filter(grepl("^[ABCD]", locus), sample %in% all_samples)
 ```
-# Prediction frequency
+# Calculations
+
+### Prediction frequency
 
 ```{r}
 prediction_frequency <- all_hla %>% 
@@ -38,56 +41,13 @@ prediction_frequency <- all_hla %>%
 
 ```
 
-```{r, fig.width = 12, fig.height = 4}
-prediction_frequency %>% 
-  filter(grepl("^[ABC]", locus)) %>% 
-  gg_frequency()
-```
-
-```{r, fig.width = 18, fig.height = 4}
-dp <- prediction_frequency %>% 
-  filter(grepl("^DP", locus) & genotyper %in% c("arcasHLA", "hlaminer"),) %>% 
-  gg_frequency()
-
-dq <- prediction_frequency %>% 
-  filter(grepl("^DQ", locus) & genotyper %in% c("arcasHLA", "hlaminer", "phlat"),) %>% 
-  gg_frequency()
-
-dra <- prediction_frequency %>% 
-  filter(grepl("^DRA", locus) & genotyper %in% c("arcasHLA", "hlaminer"),) %>% 
-  gg_frequency()
-
-drb1 <- prediction_frequency %>% 
-  filter(grepl("^DRB1", locus) & genotyper %in% c("arcasHLA", "hlaminer", "phlat"),) %>% 
-  gg_frequency()
-
-drb345 <- prediction_frequency %>% 
-  filter(grepl("^DRB[345]", locus) & genotyper %in% c("arcasHLA", "hlaminer"),) %>% 
-  gg_frequency()
-
-dp|
-  strip_y(dq)|
-  strip_y(dra)|
-  strip_y(drb1)|
-  strip_y(drb345)|
-  plot_layout(widths = c(4,6,2,3,6))
-```
-
-# Accuracy
+### Original accuracy
 
 ```{r}
 hla_compare_woNA <- compare_hla(hla_df = all_hla, reference = "invitro", exclude_missing = F, compare_function = "accuracy")
 ```
 
-```{r}
-p1 <- hla_compare_woNA %>% 
-  filter(grepl("^[ABC]", locus)) %>% 
-  gg_accuracy() +
-  ggtitle("MHC1 loci accuracy", subtitle = "Missing predictions excluded")
-p1
-```
-
-# Updating molecular HLA typing across timepoints
+### Updated accuracy with expanded HLA
 
 ```{r}
 ### Every subject has molecular HLA typing, but may occur in the BL, AC, or CV timepoint
@@ -111,20 +71,19 @@ all_hla_expanded <- all_hla %>%
   bind_rows(all_hla %>% filter(genotyper != "invitro"))
 ```
 
+### Plots to compare original and expanded
+
 ```{r}
+p1 <- hla_compare_woNA %>% 
+  filter(grepl("^[ABC]", locus)) %>% 
+  gg_accuracy() +
+  ggtitle("MHC1 loci accuracy", subtitle = "Missing predictions excluded")
 p2 <- compare_hla(hla_df = all_hla_expanded %>% filter(grepl("BL$", sample)), reference = "invitro", exclude_missing = F, compare_function = "accuracy") %>% 
   filter(grepl("^[ABC]", locus)) %>% 
   gg_accuracy() +
   ggtitle("MHC1 loci accuracy", subtitle = "Missing predictions excluded")
-p2
-```
-
-```{r, fig.height = 6, fig.width = 12}
-library(patchwork)
 p1/p2
 ```
-
-# Assemble accuracy
 
 ### Success
 ```{r}
@@ -133,10 +92,66 @@ success_df <- compare_hla(hla_df = all_hla_expanded %>% filter(grepl("BL$", samp
             exclude_missing = T, 
             compare_function = "accuracy") 
 ```
+
+### Accuracy
+
+```{r}
+accuracy_df <- compare_hla(hla_df = all_hla_expanded %>% filter(grepl("BL$", sample)), 
+            reference = "invitro", 
+            exclude_missing = F, 
+            compare_function = "accuracy") 
+```
+
+# Plotting
+
+### Frequency
+
 ```{r, fig.width = 12, fig.height = 4}
-success_df%>% 
+c1_f <- prediction_frequency %>% 
   filter(grepl("^[ABC]", locus)) %>% 
-  gg_accuracy()
+  gg_frequency()
+c1_f
+```
+
+```{r, fig.width = 18, fig.height = 4}
+dp <- prediction_frequency %>% 
+  filter(grepl("^DP", locus) & genotyper %in% c("arcasHLA", "hlaminer"),) %>% 
+  gg_frequency()
+
+dq <- prediction_frequency %>% 
+  filter(grepl("^DQ", locus) & genotyper %in% c("arcasHLA", "hlaminer", "phlat"),) %>% 
+  gg_frequency()
+
+dra <- prediction_frequency %>% 
+  filter(grepl("^DRA", locus) & genotyper %in% c("arcasHLA", "hlaminer"),) %>% 
+  gg_frequency()
+
+drb1 <- prediction_frequency %>% 
+  filter(grepl("^DRB1", locus) & genotyper %in% c("arcasHLA", "hlaminer", "phlat"),) %>% 
+  gg_frequency()
+
+drb345 <- prediction_frequency %>% 
+  filter(grepl("^DRB[345]", locus) & genotyper %in% c("arcasHLA", "hlaminer"),) %>% 
+  gg_frequency()
+
+c2_f <- dp|
+  strip_y(dq)|
+  strip_y(dra)|
+  strip_y(drb1)|
+  strip_y(drb345)|
+  plot_layout(widths = c(4,6,2,3,6))
+
+c2_f
+```
+
+### Success
+
+```{r, fig.width = 12, fig.height = 4}
+c1_s <- success_df%>% 
+  filter(grepl("^[ABC]", locus)) %>% 
+  gg_accuracy() +
+  ylab("Success")
+c1_s
 ```
 
 
@@ -161,26 +176,22 @@ drb345_s <- success_df %>%
   filter(grepl("^DRB[345]", locus) & genotyper %in% c("arcasHLA", "hlaminer"),) %>% 
   gg_accuracy()
 
-dp_s|
+c2_s <- dp_s+ylab("Success")|
   strip_y(dq_s)|
   # strip_y(dra_s)|
   strip_y(drb1_s)|
   strip_y(drb345_s)|
   plot_layout(widths = c(4,6,3,6))
+c2_s
 ```
 
 ### Accuracy
 
-```{r}
-accuracy_df <- compare_hla(hla_df = all_hla_expanded %>% filter(grepl("BL$", sample)), 
-            reference = "invitro", 
-            exclude_missing = F, 
-            compare_function = "accuracy") 
-```
 ```{r, fig.width = 12, fig.height = 4}
-accuracy_df%>% 
+c1_a <- accuracy_df%>% 
   filter(grepl("^[ABC]", locus)) %>% 
   gg_accuracy()
+c1_a
 ```
 
 ```{r, fig.width = 16, fig.height = 4}
@@ -204,10 +215,20 @@ drb345_a <- accuracy_df %>%
   filter(grepl("^DRB[345]", locus) & genotyper %in% c("arcasHLA", "hlaminer"),) %>% 
   gg_accuracy()
 
-dp_a|
+c2_a <- dp_a|
   strip_y(dq_a)|
   # strip_y(dra_a)|
   strip_y(drb1_a)|
   strip_y(drb345_a)|
   plot_layout(widths = c(4,6,3,6))
+c2_a
 ```
+
+# Full figure
+
+```{r, fig.width = 18, fig.height = 12}
+(c1_f | c2_f | plot_layout(widths = c(9,18))) /
+  (c1_s | c2_s | plot_layout(widths = c(9,18))) /
+  (c1_a | c2_a | plot_layout(widths = c(9,18)))
+```
+
