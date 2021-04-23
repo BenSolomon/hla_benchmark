@@ -3,6 +3,8 @@ title: "4) Predicting HLA-DRB4 paralogs"
 output: html_notebook
 ---
 
+# Startup
+
 ```{r}
 library(tidyverse)
 source("data_import_functions.R")
@@ -19,6 +21,7 @@ arcas_log_dir <- sprintf("%s/logs/210309_155222",isb_path)
 alignment_stats_df <- hla_mapping_stats_import(isb_samples, arcas_log_dir)
 ```
 
+# Determining DRB inclusion threshold
 
 ```{r}
 # Generate df with set of DRB genes determined for each sample from 
@@ -85,5 +88,61 @@ DRB_threshold_accuracy  %>%
   theme(axis.text.x = element_text(angle = 90)) +
   scale_y_continuous(n.breaks = 10)+
   scale_color_brewer(palette = "Dark2")
+```
+
+# Comparing effect on overall DRB accuracy
+
+```{r}
+# Create a version of all_hla_expanded for only DRB3/4/5 where there is an entry
+# for DRB3, 4, and 5 for invitro, arcasHLA, and hlaminer. If there is no prediction
+# for a resulting entry, "X" is input so that if invitro and a genotyper have an "X"
+# that would be considered a match.
+
+drb_testing <- expand.grid(sample = all_hla_expanded %>% pull(sample) %>% unique(), 
+            allele_id = c("1","2"),
+            locus = c("DRB3", "DRB4", "DRB5"),
+            genotyper = c("invitro", "arcasHLA", "hlaminer")) %>% 
+  arrange(sample, locus, genotyper, allele_id) %>% 
+  left_join(all_hla_expanded %>% filter(genotyper %in% c("invitro", "arcasHLA", "hlaminer")), join_by = c("sample", "allele_id", "locus", "genotyper"))
+  # # Fill in "X"s for NA resulting from the expansion, but not because of original
+  # # failed genotyping predictions
+  # mutate(field_1 = ifelse(is.na(field_1), "X", field_1)) %>% 
+  # mutate_at(vars(field_2:field_3), funs(ifelse(is.na(.) & field_1 == "X", "X", .)))
+drb_testing
+```
+
+```{r, warning = F}
+compare_hla(hla_df = drb_testing %>% filter(grepl("BL$", sample)), 
+            reference = "invitro", 
+            exclude_missing = F, 
+            compare_function = "accuracy") %>% 
+  gg_accuracy()
+```
+
+
+```{r}
+DRB_gene_predictions <- DRB_relative_filter(relative_var="reads", threshold=0.05)
+DRB_gene_predictions
+```
+
+```{r, warning=F}
+x <- compare_hla(hla_df = drb_testing %>% filter(grepl("BL$", sample)), 
+            reference = "invitro", 
+            exclude_missing = F, 
+            compare_function = "accuracy",
+            na_drop = F) %>% 
+  left_join(valid_DRB, join_by = c("sample", "locus")) %>% 
+  mutate(valid_invitro = map_lgl(reference, function(x) any(!grepl("X", x)))) %>% 
+  filter(valid_DRB == T | valid_invitro == T)
+```
+
+```{r}
+any(!grepl("X", c("01","X")))
+```
+
+
+```{r}
+valid_DRB <- DRB_gene_predictions %>% mutate(locus = str_split(locus, "-")) %>% unnest(locus) %>% mutate(valid_DRB = T)
+x <- hla_compare_composite %>% left_join(valid_DRB, join_by = c("sample", "locus")) %>% mutate(not_DRB = !grepl("DRB", locus))
 ```
 

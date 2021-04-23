@@ -50,7 +50,7 @@ allele_match <- function(ref,comp){
 # unit_test_output
 
 
-compare_hla<- function(hla_df, reference = "invitro", exclude_missing=T, compare_function = "accuracy"){
+compare_hla<- function(hla_df, reference = "invitro", exclude_missing=T, compare_function = "accuracy", na_drop = T){
   # Input checks
   arg_col <- makeAssertCollection()
   hla_df_columns <- c("sample", "allele_id", "locus", "field_1", "field_2", "field_3", "genotyper")
@@ -77,13 +77,13 @@ compare_hla<- function(hla_df, reference = "invitro", exclude_missing=T, compare
       filter_at(vars(contains("n_")), function(x) x ==2)
   }
   if (compare_function == "accuracy"){
-    df %>% 
-      mutate(accuracy = map2_dbl(reference, allele, allele_match)) %>% 
-      drop_na()
+    df <- df %>% mutate(accuracy = map2_dbl(reference, allele, allele_match))
   } else if (compare_function == "agreement"){
-    df %>%
-      mutate(accuracy = map2_dbl(reference, allele, allele_agreement))%>%
-      drop_na()
+    df %>% mutate(accuracy = map2_dbl(reference, allele, allele_agreement))
   } 
+  if (na_drop == T){
+    df <- df %>% drop_na()
+  }
+  df
 }
 # compare_hla(hla_df = all_hla, reference = "invitro", exclude_missing = T, compare_function = "accuracy")

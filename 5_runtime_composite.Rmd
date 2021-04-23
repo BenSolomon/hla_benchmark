@@ -61,7 +61,6 @@ reference <- "invitro"
 hla_compare_composite<- all_hla_expanded %>%
   filter(grepl("BL$", sample)) %>% 
   filter(grepl("^[ABCD]", locus)) %>% 
-  mutate(field_2 = paste(field_1, field_2, sep = "_"), field_3 = paste(field_2, field_3, sep = "_")) %>%
   select(-allele_id) %>%
   group_by(sample, locus, genotyper) %>%
   summarise_all(list) %>%
@@ -95,4 +94,13 @@ hla_compare_composite %>%
 ```
 
 
+```{r}
+valid_DRB <- DRB_gene_predictions %>% mutate(locus = str_split(locus, "-")) %>% unnest(locus) %>% mutate(valid_DRB = T)
+x <- hla_compare_composite %>% left_join(valid_DRB, join_by = c("sample", "locus")) %>% mutate(not_DRB = !grepl("DRB", locus))
+```
+
+
+```{r}
+hla_compare_composite
+```
 
