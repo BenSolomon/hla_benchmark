@@ -156,3 +156,25 @@ format_hla_table <- function(hla_table){
 }
 # format_hla_table(combine_HLA_import(path = isb_path, samples = isb_samples))
 
+
+# Import HLA loci alignment stats from arcas logs
+hla_mapping_stats_import <- function(samples, log_dir){
+  tibble(sample = samples) %>% 
+    mutate(data = map(sample, function(x){
+      log_path <- sprintf("%s/%s/%s_arcas_genotype.log",log_dir,x,x)
+      df <- tibble(lines = read_lines(log_path))
+      if (any(grepl("error", df$lines, ignore.case = T))){
+        NA
+      } else {
+        df %>% 
+          mutate(lines = gsub("\t", "", lines)) %>% 
+          filter(grepl("^HLA", lines)) %>% 
+          separate(lines, into = c("locus", "abundance", "reads", "classes"), sep = " +")
+      }
+    })) %>%
+    unnest(data) %>% 
+    select(-data) %>% 
+    separate(locus, into = c(NA, "locus"), sep = "-")
+}
+# arcas_log_dir <- sprintf("%s/logs/210309_155222",isb_path)
+# hla_mapping_stats_import(isb_samples, arcas_log_dir)

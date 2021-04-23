@@ -4,31 +4,25 @@ output: html_notebook
 ---
 
 ```{r}
+library(tidyverse)
+source("data_import_functions.R")
 all_hla_expanded <- readRDS("all_hla_expanded.RDS")
+isb_path <- "/labs/khatrilab/solomonb/covid/isb"
+isb_samples <- read_tsv("/labs/khatrilab/solomonb/covid/isb/logs/210217_232725/parallel.log") %>% 
+  separate(Command, into = c(NA, "sample"), sep = " ") %>% 
+  pull(sample) %>% unique()
 ```
 
 
 ```{r}
-alignment_stats_df <- tibble(sample = isb_samples) %>% 
-  mutate(data = map(sample, function(x){
-    log_path <- sprintf("%s/logs/210309_155222/%s/%s_arcas_genotype.log",isb_path,x,x)
-    df <- tibble(lines = read_lines(log_path))
-    if (any(grepl("error", df$lines, ignore.case = T))){
-      NA
-    } else {
-      df %>% 
-        mutate(lines = gsub("\t", "", lines)) %>% 
-        filter(grepl("^HLA", lines)) %>% 
-        separate(lines, into = c("locus", "abundance", "reads", "classes"), sep = " +")
-    }
-  })) %>%
-  unnest(data) %>% 
-  select(-data) %>% 
-  separate(locus, into = c(NA, "locus"), sep = "-")
+arcas_log_dir <- sprintf("%s/logs/210309_155222",isb_path)
+alignment_stats_df <- hla_mapping_stats_import(isb_samples, arcas_log_dir)
 ```
 
 
 ```{r}
+# Generate df with set of DRB genes determined for each sample from 
+# arcasHLA alignment vs. molecular typing
 drb_genes_df <- all_hla_expanded %>% 
   filter(grepl("BL$", sample)) %>% # Limit to one time collection, so no repeats
   select(sample, locus, genotyper) %>% 
@@ -39,28 +33,28 @@ drb_genes_df <- all_hla_expanded %>%
   summarise(locus = paste(locus, collapse = "-")) %>% 
   pivot_wider(names_from = "genotyper", values_from = "locus", values_fill = NA) %>% 
   drop_na()
+drb_genes_df
 ```
 
 ```{r}
+# Generates set of DRB genes with number of mapped reads reaching a 
+# specified threshold. Depends on alignment_stats_df
 DRB_relative_filter <- function(relative_var="reads", threshold=0.05){
   alignment_stats_df %>% 
-  # mutate(abundance = as.numeric(gsub("\\%", "", abundance))) %>% 
   filter(grepl("DRB[1345]", locus)) %>% 
   mutate_at(c('reads', 'classes'), as.numeric) %>% 
   group_by(sample) %>% 
-  # mutate(freq = round(sym(relative_var)/sum(sym(relative_var)), digits = 2)) %>% 
   mutate(freq = round(!!sym(relative_var)/sum(!!sym(relative_var)), digits = 2)) %>% 
   select(sample, locus, freq) %>% 
   filter(freq >= threshold) %>% 
   arrange(locus, .by_group = T) %>% 
   summarise(locus = paste(locus, collapse = "-")) 
 }
-
 DRB_relative_filter()
 ```
 
 ```{r}
-x <- tibble(relative_var = c("reads", "classes")) %>% 
+DRB_threshold_accuracy <- tibble(relative_var = c("reads", "classes")) %>% 
   mutate(data = map(relative_var, function(relative_var){
     tibble(thresh = seq(0,1, by = 0.01)) %>% 
       mutate(data = map(thresh, function(x) DRB_relative_filter(threshold = x, relative_var = relative_var))) %>% 
@@ -73,22 +67,23 @@ x <- tibble(relative_var = c("reads", "classes")) %>%
   })) %>% 
   unnest(data) %>% 
   pivot_longer(!relative_var, names_to = "threshold", values_to = "accuracy", names_prefix = "threshold_") %>% 
-  {.$accuracy[.$threshold=="arcasHLA"][1]->>arcas;.} %>% 
+  # Output accuracy with no threshold
+  {.$accuracy[.$threshold=="arcasHLA"][1]->>baseline_arcas_accuracy;.} %>% 
   filter(threshold != "arcasHLA") %>% 
   mutate(threshold = as.numeric(threshold)) 
+DRB_threshold_accuracy
+```
 
-
-x %>% 
+```{r}
+DRB_threshold_accuracy  %>% 
   ggplot(aes(x = threshold, y = accuracy, color = relative_var))+
   geom_path()+
-  geom_hline(yintercept = arcas, color = "red")+
+  geom_hline(yintercept = baseline_arcas_accuracy, color = "red")+
   geom_point()+
   coord_cartesian(ylim = c(0, 1))+
   theme_bw() +
   theme(axis.text.x = element_text(angle = 90)) +
   scale_y_continuous(n.breaks = 10)+
   scale_color_brewer(palette = "Dark2")
-# +
-  # ggtitle("Accuracy of genes in DRB loci", subtitle = sprintf("Gene inclusion genotype based on relative %s threshold", relative_var))
 ```
 

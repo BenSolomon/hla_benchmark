@@ -1,0 +1,98 @@
+---
+title: "5) Composite HLA scores"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+source("data_import_functions.R")
+source("accuracy_functions.R")
+source("ggplot_layouts.R")
+all_hla_expanded <- readRDS("all_hla_expanded.RDS")
+isb_path <- "/labs/khatrilab/solomonb/covid/isb"
+isb_samples <- read_tsv("/labs/khatrilab/solomonb/covid/isb/logs/210217_232725/parallel.log") %>% 
+  separate(Command, into = c(NA, "sample"), sep = " ") %>% 
+  pull(sample) %>% unique()
+```
+
+
+```{r}
+composite_function <- function(locus, arcas, opti, phlat, field){
+  if (locus %in% c("A","B","C")){
+    if (!is.na(opti) & field != "field_3"){tibble(genotyper_composite = list(opti), composite_source = "optitype")}
+    else if (!is.na(phlat)){tibble(genotyper_composite = list(phlat), composite_source = "phlat")}
+    else if (!is.na(arcas)){tibble(genotyper_composite = list(arcas), composite_source = "arcasHLA")}
+    else {tibble(genotyper_composite = list(NA), composite_source = NA)}
+  }
+  else if (locus %in% c("DQB1")){
+    if (!is.na(phlat)){tibble(genotyper_composite = list(phlat), composite_source = "phlat")}
+    else if (!is.na(arcas)){tibble(genotyper_composite = list(arcas), composite_source = "arcasHLA")}
+    else {tibble(genotyper_composite = list(NA), composite_source = NA)}
+  }
+  else {
+    if (!is.na(arcas)){tibble(genotyper_composite = list(arcas), composite_source = "arcasHLA")}
+    else if (!is.na(phlat)){tibble(genotyper_composite = list(phlat), composite_source = "phlat")}
+    else {tibble(genotyper_composite = list(NA), composite_source = NA)}
+  }
+}
+
+composite_no_phlat <- function(locus, arcas, opti, field){
+  if (locus %in% c("A","B","C")){
+    if (!is.na(opti) & field != "field_3"){tibble(genotyper_composite_no_phlat = list(opti), composite_no_phlat_source = "optitype")}
+    else if (!is.na(arcas)){tibble(genotyper_composite_no_phlat = list(arcas), composite_no_phlat_source = "arcasHLA")}
+    else {tibble(genotyper_composite_no_phlat = list(NA), composite_no_phlat_source = NA)}
+  }
+  else if (locus %in% c("DQB1")){
+    if (!is.na(arcas)){tibble(genotyper_composite_no_phlat = list(arcas), composite_no_phlat_source = "arcasHLA")}
+    else {tibble(genotyper_composite_no_phlat = list(NA), composite_no_phlat_source = NA)}
+  }
+  else {
+    if (!is.na(arcas)){tibble(genotyper_composite_no_phlat = list(arcas), composite_no_phlat_source = "arcasHLA")}
+    else {tibble(genotyper_composite_no_phlat = list(NA), composite_no_phlat_source = NA)}
+  }
+}
+
+composite_function(locus = "A", arcas = c("01","01"), opti = c("02","02"), phlat = c("03","03"), field = "field_1")
+composite_function(locus = "A", arcas = NA, opti = "02", phlat = "03", field = "field_1")
+```
+
+```{r, message=F, warning=F, error=F}
+reference <- "invitro"
+hla_compare_composite<- all_hla_expanded %>%
+  filter(grepl("BL$", sample)) %>% 
+  filter(grepl("^[ABCD]", locus)) %>% 
+  mutate(field_2 = paste(field_1, field_2, sep = "_"), field_3 = paste(field_2, field_3, sep = "_")) %>%
+  select(-allele_id) %>%
+  group_by(sample, locus, genotyper) %>%
+  summarise_all(list) %>%
+  pivot_longer(cols = !c(sample, locus, genotyper), names_to = "field", values_to = "allele") %>%
+  pivot_wider(names_from = "genotyper", names_prefix = "genotyper_", values_from = "allele", values_fill = list(NA)) %>%
+  dplyr::rename("reference" = contains(reference)) %>%
+  mutate(data = try(pmap(list(locus, genotyper_arcasHLA, genotyper_optitype, genotyper_phlat, field), composite_function))) %>% 
+  unnest(data) %>% 
+  mutate(data = try(pmap(list(locus, genotyper_arcasHLA, genotyper_optitype, field), composite_no_phlat))) %>% 
+  unnest(data) %>% 
+  select(-composite_source, -composite_no_phlat_source) %>% 
+  pivot_longer(contains("genotyper"),  names_to = "genotyper", values_to = "allele",names_prefix = "genotyper_") %>% 
+  mutate(accuracy = map2_dbl(reference, allele, allele_match)) %>% 
+  drop_na() %>% 
+  mutate(genotyper = fct_recode(genotyper, "comp_AOP" = "composite", "comp_AO" = "composite_no_phlat")) %>% 
+  mutate(genotyper = fct_relevel(factor(genotyper), "comp_AOP", "comp_AO"))
+```
+
+```{r, fig.width=12, fig.height=4}
+hla_compare_composite %>% 
+  filter(grepl("^[ABC]", locus)) %>% 
+  gg_accuracy()
+```
+
+
+```{r, fig.width = 12, fig.height = 4}
+# compare_haplo(hla_compare_composite, mhc2_loci = c("DPA1", "DPB1","DQA1","DQB1","DRB1", "DRB3", "DRB4", "DRB5")) %>%  
+#   gg_accuracy() +
+#   facet_nested(.~locus+genotyper, scales = "free_y") +
+#     ggtitle("Haplotype accuracy", subtitle = "Composite heuristic added, missing predictions included")
+```
+
+
+
