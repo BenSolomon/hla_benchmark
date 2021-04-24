@@ -308,6 +308,7 @@ drb345_filtered
 
 # Comparing effect on overall DRB accuracy
 
+
 ```{r}
 # Create a version of all_hla_expanded for only DRB3/4/5 where there is an entry
 # for DRB3, 4, and 5 for invitro, arcasHLA, and hlaminer. If there is no prediction
@@ -315,11 +316,16 @@ drb345_filtered
 # that would be considered a match.
 
 drb_testing <- expand.grid(sample = all_hla_expanded %>% pull(sample) %>% unique(), 
-            allele_id = c("1","2"),
-            locus = c("DRB3", "DRB4", "DRB5"),
-            genotyper = c("invitro", "arcasHLA", "hlaminer")) %>% 
+                           allele_id = c("1","2"),
+                           locus = c("DRB3", "DRB4", "DRB5"),
+                           genotyper = c("invitro", "unfiltered", "filtered")) %>% 
   arrange(sample, locus, genotyper, allele_id) %>% 
-  left_join(all_hla_expanded %>% filter(genotyper %in% c("invitro", "arcasHLA", "hlaminer")), join_by = c("sample", "allele_id", "locus", "genotyper")) %>% 
+  left_join(
+    bind_rows(
+      all_hla_expanded %>% filter(genotyper == "invitro" & grepl("^DRB[345]", locus)),
+      all_hla_expanded %>% filter(genotyper == "arcasHLA" & grepl("^DRB[345]", locus)) %>% mutate(genotyper = "unfiltered"), 
+      drb345_filtered %>% select(-copy_number, -.pred_class) %>% mutate(genotyper = "filtered")), 
+    join_by = c("sample", "allele_id", "locus", "genotyper")) %>% 
   # Fill in "X"s for NA resulting from the expansion, but not because of original
   # failed genotyping predictions
   mutate(field_1 = ifelse(is.na(field_1), "X", field_1)) %>%
@@ -332,6 +338,7 @@ compare_hla(hla_df = drb_testing %>% filter(grepl("BL$", sample)),
             reference = "invitro", 
             exclude_missing = F, 
             compare_function = "accuracy") %>% 
+  mutate(genotyper = fct_relevel(genotyper, "unfiltered")) %>% 
   gg_accuracy()
 ```
 
