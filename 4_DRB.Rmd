@@ -164,7 +164,8 @@ drb345_df %>%
 
 ```{r}
 # Train/test split
-drb_split <- initial_split(z %>% mutate(copy_number = factor(copy_number)), prop = 0.7, strata = copy_number)
+set.seed(123)
+drb_split <- initial_split(drb345_df %>% mutate(copy_number = factor(copy_number)), prop = 0.7, strata = copy_number)
 drb_train <- drb_split %>% training()
 drb_test <- drb_split %>% testing()
 ```
@@ -179,17 +180,32 @@ drb_model <- nearest_neighbor() %>%
 #   set_engine("ranger")
 # drb_model <- discrim::naive_Bayes() %>% 
 #   set_engine("naivebayes")
-drb_fit <- drb_model %>% 
-  fit(copy_number ~locus+DRB3+DRB4+DRB5, data = drb_train)
+
+# drb_fit <- drb_model %>% last_fit(copy_number ~locus+DRB3+DRB4+DRB5, split = drb_split)
+drb_fit <- drb_model %>% fit(copy_number ~locus+DRB3+DRB4+DRB5, data = drb_train)
 ```
 
 ```{r}
 # Model predictions
-drb_predict <- predict(drb_fit, new_data = drb_test)
-drb_prob <- predict(drb_fit, new_data = drb_test, type='prob')
-drb_outcome <- drb_test %>% bind_cols(drb_predict,drb_prob)
+
+# drb_outcome <- drb_fit %>% 
+#   collect_predictions() %>% 
+#   left_join(
+#     drb345_df %>% 
+#       mutate(.row = 1:n()) %>% 
+#       select(-copy_number),
+#     by = ".row"
+#   )
+
+drb_outcome <- drb_test %>% 
+  bind_cols(
+    drb_fit %>% predict(new_data = drb_test), 
+    drb_fit %>% predict(new_data = drb_test, type = 'prob') 
+  )
+
 drb_outcome
 ```
+
 
 ```{r}
 # Confidence matrix
@@ -206,11 +222,28 @@ drb_outcome %>%
 ```
 ```{r}
 # AUC calculation
-drb_outcome %>% 
-  roc_auc(truth = copy_number, .pred_0:.pred_2)
+drb_outcome %>% roc_auc(truth = copy_number, .pred_0:.pred_2)
 ```
 
-
+```{r}
+### CV approach
+# Create workflow
+set.seed(1)
+drb_wkfl <- workflow() %>% 
+  add_recipe(recipe(copy_number ~locus+DRB3+DRB4+DRB5, data = drb_split)) %>% 
+  add_model(drb_model)
+# Single train/test model with prediction
+drb_wkfl %>% last_fit(split = drb_split) %>% collect_metrics()
+# 10-fold CV tuning
+drb_folds <- vfold_cv(drb_train, v = 10, strata = copy_number)
+drb_rs <- drb_wkfl %>% fit_resamples(resamples = drb_folds, control = control_resamples(save_pred = T))
+drb_rs %>% collect_metrics()
+drb_rs %>%
+  collect_predictions() %>% 
+  group_by(id) %>% 
+  roc_curve(truth = copy_number, .pred_0:.pred_2) %>% 
+  autoplot()
+```
 
 
 ### Accuracy of baseline arcas
@@ -247,6 +280,31 @@ conf_mat(drb_outcome_2,
   autoplot(type = 'mosaic')
 ```
 
+# Update DBR genotypes
+
+```{r}
+# Predictions from full data
+drb_key <- drb345_df %>% bind_cols(
+  drb_fit %>% predict(new_data = drb345_df)
+) %>% 
+  select(sample, time, locus, copy_number, .pred_class) %>% 
+  unite(sample, sample, time, sep = "-")
+drb_key
+```
+
+```{r}
+# Join key, and 
+drb345_filtered <- all_hla_expanded %>% 
+  filter(genotyper == "arcasHLA" & grepl("^DRB[345]", locus)) %>% 
+  left_join(drb_key, by = c("sample", "locus")) %>% 
+  mutate(.pred_class = as.character(.pred_class)) %>% 
+  mutate_at(vars(c("copy_number", ".pred_class")), function(x) ifelse(is.na(x), "0", x)) %>% 
+  # allele_id is in order of best match per locus, so filtering to keep only
+  # those allele_ids lower or equal to the .pred_class will keep only the
+  # best alleles up to the allowable number for a given locus
+  filter(allele_id <= .pred_class) 
+drb345_filtered
+```
 
 # Comparing effect on overall DRB accuracy
 
