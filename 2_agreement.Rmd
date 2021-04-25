@@ -3,3 +3,133 @@ title: "R Notebook"
 output: html_notebook
 ---
 
+# Setup
+```{r, message=F}
+library(tidyverse)
+library(ggh4x)
+library(patchwork)
+source("accuracy_functions.R")
+source("ggplot_layouts.R.R")
+all_hla_expanded <- readRDS("all_hla_expanded.RDS")
+```
+
+# Time-specific accuracy
+```{r, message==F, warning=F}
+accuracy_df <- compare_hla(hla_df = all_hla_expanded, 
+                 reference = "invitro", 
+                 exclude_missing = F, 
+                 compare_function = "accuracy") %>% 
+  select(sample, locus, field, genotyper, accuracy) %>% 
+  separate(sample, into = c('sample','time'), sep = '-') 
+```
+
+```{r, fig.width = 12, fig.height = 4}
+accuracy_df %>% filter(grepl("^[ABC]", locus) & time == "BL") %>% gg_accuracy()
+accuracy_df %>% filter(grepl("^[ABC]", locus) & time == "AC") %>% gg_accuracy()
+```
+
+```{r, fig.width = 18, fig.height = 4}
+accuracy_df %>% filter(grepl("^D", locus) & time == "BL") %>% gg_accuracy()
+accuracy_df %>% filter(grepl("^D", locus) & time == "AC") %>% gg_accuracy()
+```
+# Sample agreement
+
+```{r allele_agreement}
+allele_agreement <- function(ref,comp){
+  n_ref <- length(ref)
+  n_comp <- length(comp)
+  if (n_ref >2 | n_comp > 2){
+    return(NA)
+    print("Invalid number of alleles")
+  # If only one allele typed in reference, only need one match in comparison
+  } else if (n_ref == 1){
+   sum(any(ref == comp, na.rm = T))
+  # Matches when all alleles present
+  # Forward and reverse match search since order does not matter
+ } else if (n_ref == 2){
+    max(sum(ref == comp, na.rm = T)/2, sum(ref == rev(comp), na.rm = T)/2)
+ }
+}
+```
+
+```{r gg_agreement}
+agreement_hla <- function(df, collections, complete_match=T){
+  df <- df %>% 
+    separate(sample, into = c("sample", "collection"), sep = "-") %>% 
+    filter(collection %in% collections) %>% 
+    filter(genotyper != "invitro", grepl("^[ABCD]", locus)) %>% 
+    mutate(field_2 = paste(field_1, field_2, sep = "_"), field_3 = paste(field_2, field_3, sep = "_")) %>%
+    select(-allele_id) %>%
+    group_by(sample, locus, genotyper, collection) %>%
+    summarise_all(list) %>%
+    pivot_longer(cols = !c(sample, locus, genotyper, collection), names_to = "field", values_to = "allele") %>%
+     pivot_wider(names_from = "collection", names_prefix = "collection_", values_from = "allele", values_fill = list(NA)) %>% 
+    # drop_na() %>% 
+    rename("reference" = contains(collections[1])) %>%
+    pivot_longer(contains("collection"),  names_to = "collection", values_to = "allele",names_prefix = "collection_") 
+  if (complete_match == T){
+    df <- df %>% 
+      # Filtering only samples/loci that have 2 alleles in both reference and comparison
+      filter_at(vars(c(reference, allele)), function(x) !is.na(x)) %>%
+      mutate(n_reference = map_dbl(reference, function(x) sum(!is.na(x) & !grepl("NA", x)))) %>%
+      mutate(n_allele = map_dbl(allele, function(x) sum(!is.na(x) & !grepl("NA", x)))) %>%
+      filter_at(vars(contains("n_")), function(x) x ==2) %>%
+      mutate(accuracy = map2_dbl(reference, allele, allele_agreement)) %>%
+    drop_na()
+  } else {
+    df <- df %>% 
+      mutate(accuracy = map2_dbl(reference, allele, allele_agreement)) 
+    # %>% 
+      # drop_na()      
+  }
+  df 
+}
+```
+
+### *In silico* agreement with each other
+
+```{r, fig.width = 18, fig.height=4}
+agreement_hla(all_hla_expanded, collections = c("AC", "BL"), complete_match = F) %>% gg_accuracy()
+# agreement_hla(all_hla_expanded, collections = c("AC", "BL"), complete_match = F) %>% gg_accuracy()
+```
+# Expected vs. actual accuracy
+```{r, fig.width = 18, fig.height = 4}
+accuracy_df %>% 
+  filter(!(time %in% c("CV", "PD1"))) %>% 
+  pivot_wider(names_from = "time", values_from = "accuracy") %>% 
+  mutate(accuracy = AC * BL) %>% 
+  gg_accuracy
+```
+
+```{r}
+x <- agreement_hla(all_hla_expanded, collections = c("AC", "BL"), complete_match = F) %>% 
+  select(sample, locus, genotyper, field, agreement_observed = accuracy) %>% 
+  left_join(
+    accuracy_df %>% 
+      filter(!(time %in% c("CV", "PD1"))) %>% 
+      pivot_wider(names_from = "time", values_from = "accuracy") %>% 
+      mutate(agreement_expected = AC * BL) %>% 
+      select(-AC, -BL),
+    join_by = c("sample", "locus", "field", "genotyper")
+  ) %>% 
+  drop_na() %>%
+  pivot_longer(cols = contains("agreement"), names_to = "metric", names_prefix = "agreement_", values_to = "agreement")
+```
+###### FIGURE OUT WHAT IS GOING ON WITH NAs
+
+
+```{r, fig.width = 18, fig.height = 4}
+x %>% 
+  filter(field == "field_2") %>% 
+  ggplot(aes(x = metric, y = agreement))+
+    stat_summary(fun = mean, geom = "point", position = position_dodge(width=0.9)) +
+    stat_summary(fun.data = mean_se, geom = "errorbar", position=position_dodge(width=0.9)) +
+    theme_bw() +
+    facet_nested(.~locus+genotyper, scales = "free_y") +
+    coord_cartesian(ylim = c(0,1))+
+    scale_y_continuous(n.breaks = 6)+
+    labs(y = "Accuracy", x = "")+
+    theme(axis.text.x = element_text(angle = 90))+
+    theme(panel.spacing = unit(0.1,"line"))
+```
+
