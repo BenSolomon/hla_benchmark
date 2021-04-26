@@ -178,3 +178,28 @@ hla_mapping_stats_import <- function(samples, log_dir){
 }
 # arcas_log_dir <- sprintf("%s/logs/210309_155222",isb_path)
 # hla_mapping_stats_import(isb_samples, arcas_log_dir)
+
+
+
+scHLA_import <- function(sample, result_path, barcode_path){
+  pool <- str_split(sample, "_",simplify = T)[2]
+  mm <- Matrix::readMM(sprintf("%s/%s_results/count_matrix.mtx", result_path, sample))
+  dimnames(mm) <- list(
+    allele = read_tsv(
+      sprintf("%s/%s_results/labels.tsv", result_path, sample),
+      col_names = "allele") %>% pull(allele), 
+    cell = read_tsv(
+      sprintf("%s/%s_barcode.tsv", barcode_path, sample), 
+      col_names = "barcode") %>% pull(barcode))
+  data.frame(allele=rownames(mm)[mm@i + 1], cell=colnames(mm)[mm@j + 1], count=mm@x) %>% 
+    mutate(cell = sprintf("%s.%s", pool, cell))
+}
+
+# scHLA_import(
+#   sample="INCOV005-BL_S7",
+#   result_path=sprintf("%s/scHLAcount/output/invitro", isb_path),
+#   barcode_path=sprintf("%s/scHLAcount/barcodes", isb_path)
+# )
+
+
+

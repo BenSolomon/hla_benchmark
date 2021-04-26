@@ -1,0 +1,135 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+source("data_import_functions.R")
+all_hla_expanded <- readRDS("all_hla_expanded.RDS")
+```
+
+
+# Running scHLA count
+
+```{r}
+hla_samples <- read_tsv("../../covid/isb/scHLAcount/all_fastq_files.txt", col_names = "file") %>% 
+  filter(grepl("^INCOV", file)) %>% 
+  filter(grepl("-BL", file)) %>% 
+  separate(file, into = c("sample", NA), sep = "_", remove = F) %>% 
+  drop_na()
+hla_samples
+```
+
+```{r}
+select_last_allele <- function(x){
+  x[!is.na(x)] %>%
+    tail(1) %>% 
+    str_replace_all("_", ":")}
+hla_key <- all_hla_expanded %>% 
+  rowwise() %>% 
+  filter(grepl("^[ABC]", locus)) %>% 
+  mutate(allele = select_last_allele(across(contains("field")))) %>% 
+  select(sample, genotyper, locus, allele) %>% 
+  unite(allele, locus, allele, sep = "*")
+hla_key
+```
+
+```{r}
+hla_merge <- hla_samples %>% 
+  left_join(hla_key, by = "sample") %>% 
+  drop_na() %>% 
+  select(-sample) %>% 
+  group_by(file, genotyper) %>% 
+  nest()
+hla_merge
+```
+
+```{r}
+hla_merge %>% 
+  # head() %>% 
+  mutate(write = pmap(list(data, file, genotyper), function(d,f,g){
+    dir <- sprintf("../../covid/isb/scHLAcount/genotypes/%s",g)
+    if (!dir.exists(dir)){dir.create(dir, recursive = T)}
+    write_tsv(d, 
+              sprintf("%s/%s_hla.tsv",dir,f), 
+              col_names = F,
+              )}))
+```
+
+### Run script
+
+`sbatch /covid/scripts/isb_scHLAcount_benchmark.sh`
+
+# UMAP projections
+
+```{r}
+srt <- readRDS("/labs/khatrilab/hongzheng/webapps/isb/srt_isb260.meta.rds")
+```
+
+```{r}
+srt %>% 
+  filter(sampleID == "INCOV005-BL") %>% 
+  # sample_frac(0.1) %>%
+  ggplot(aes(x = UMAP_1, y = UMAP_2, color = celltype)) +
+  geom_point(size = 0.5, alpha = 0.5)+
+  theme_bw() 
+
+```
+
+```{r}
+scHLA_import(
+  sample="INCOV005-BL_S7",
+  result_path=sprintf("%s/scHLAcount/output/invitro", isb_path),
+  barcode_path=sprintf("%s/scHLAcount/barcodes", isb_path)
+)
+```
+```{r}
+scHLAcount_dir <- "../../covid/isb/scHLAcount"
+
+# Create tibble of all genotyper and sample combinations
+x <- tibble(genotyper = c("invitro", "arcasHLA", "optitype", "phlat", "hlaminer")) %>% 
+  mutate(data = map(genotyper, function(x) suppressMessages(read_tsv("../../covid/isb/scHLAcount/BL_fastq_files.txt", col_names = "sample")))) %>% 
+  unnest(data) %>% 
+  # Import data based on sample and genotyper
+  mutate(result_path = sprintf("%s/output/%s",scHLAcount_dir, genotyper),
+         barcode_path = sprintf("%s/barcodes", scHLAcount_dir)) %>% 
+  head(30) %>%
+  mutate(data = pmap(list(sample, result_path, barcode_path), function(s,r,b){
+    tryCatch(suppressMessages(scHLA_import(
+      sample=s,
+      result_path=r,
+      barcode_path=b
+    )),
+    # Returns NA if no file, rather than error
+    error = function(c) NA)
+  })) 
+# %>% unnest(data) %>% 
+#   # Remove remaining data column caused by missing files, 
+#   # then remove the NAs representing those files
+#   select(-data) %>% drop_na()
+
+# showConnections()
+```
+
+
+```{r}
+hla_df <- hla_samples %>% 
+  # Filter for samples with scHLA_count data
+  rowwise() %>% mutate(path_size = length(list.files(file_path))) %>% ungroup () %>% 
+  filter(path_size != 0) %>% select(-path_size) %>% 
+  # Limit test samples
+  # head(20) %>%
+  # Import count matrix
+  mutate(count_matrix = map2(file_path, sample_run, import_count_matrix)) %>% 
+  # Order alleles within each sample
+  mutate(count_matrix = pmap(list(file_path, sample_run, count_matrix), apply_allele_order)) %>% 
+  # Calculate gene sums and ratios
+  mutate(count_matrix = map(count_matrix, gene_sums_and_ratio)) %>% 
+  unnest(count_matrix) %>%
+  mutate(cell = paste(pool, cell, sep = "."))
+```
+
+
+
+# Meta analysis
