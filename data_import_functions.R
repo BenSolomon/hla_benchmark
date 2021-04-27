@@ -180,26 +180,87 @@ hla_mapping_stats_import <- function(samples, log_dir){
 # hla_mapping_stats_import(isb_samples, arcas_log_dir)
 
 
-
-scHLA_import <- function(sample, result_path, barcode_path){
+# Basic scHLAcount count matrix import
+scHLA_import <- function(sample, result_path, label_path, barcode_path){
   pool <- str_split(sample, "_",simplify = T)[2]
-  mm <- Matrix::readMM(sprintf("%s/%s_results/count_matrix.mtx", result_path, sample))
+  mm <- Matrix::readMM(result_path)
   dimnames(mm) <- list(
-    allele = read_tsv(
-      sprintf("%s/%s_results/labels.tsv", result_path, sample),
-      col_names = "allele") %>% pull(allele), 
-    cell = read_tsv(
-      sprintf("%s/%s_barcode.tsv", barcode_path, sample), 
-      col_names = "barcode") %>% pull(barcode))
+    allele = read_tsv(label_path, col_names = "allele") %>% pull(allele), 
+    cell = read_tsv(barcode_path, col_names = "barcode") %>% pull(barcode))
   data.frame(allele=rownames(mm)[mm@i + 1], cell=colnames(mm)[mm@j + 1], count=mm@x) %>% 
     mutate(cell = sprintf("%s.%s", pool, cell))
 }
 
-# scHLA_import(
-#   sample="INCOV005-BL_S7",
-#   result_path=sprintf("%s/scHLAcount/output/invitro", isb_path),
-#   barcode_path=sprintf("%s/scHLAcount/barcodes", isb_path)
-# )
+# Applies a fixed order to paired alleles within a given sample
+# Necessary for ratios to ensure which allele is numerator/denominator
+apply_allele_order <- function(label_path, data){
+  # Key to fix order of alleles
+  allele_order_key <- read_tsv(label_path, col_names = "allele") %>% 
+    filter(grepl("\\*", allele)) %>% 
+    separate(allele, into = c("gene", "allele_id"), sep = "\\*", remove = F) %>% 
+    group_by(gene) %>% 
+    mutate(allele_order = 1:n(),
+           n_alleles_expected = n()) %>% 
+    ungroup() %>% 
+    select(allele, allele_order, n_alleles_expected)
+  # Merge key to data
+  data %>% 
+    left_join(allele_order_key, by = "allele")
+}
+
+# Records number of expected alleles based on genotype provided to scHLAcount,
+# the number of observed alleles, the counts for each allele as well as counts 
+# mapped to an HLA-gene but not a specific allele. Calculates sums and allele ratio
+gene_sums_and_ratio <- function(data){
+  data %>% 
+    separate(allele, into = c("gene", "fields"), sep = "\\*", remove = F, fill = "right") %>%
+    group_by(cell, gene) %>% 
+    # Count total reads per gene, including those not assigned at the allele level
+    mutate(gene_sum_all = sum(count)) %>% 
+    # Remove rows for counts not assigned at allele level
+    filter(!is.na(fields)) %>% 
+    # Count total reads per gene, only those that were typed at the allele level
+    mutate(gene_sum_typed = sum(count)) %>% 
+    # Calculate allele ratio
+    mutate(allele_ratio = count / gene_sum_typed) %>% 
+    # Count observed number of alleles
+    mutate(n_alleles_observed = n()) %>% 
+    drop_na() %>% 
+    select(cell, allele, allele_order, 
+           gene, fields, 
+           n_alleles_expected, n_alleles_observed, 
+           everything())
+}
+
+# Controller function for:
+### scHLA_import()
+### apply_allele_order() 
+### gene_sums_and_ratio()
+scHLA_data_processing <- function(sample, result_dir, barcode_dir){
+  # Check for all file paths
+  result_path <- sprintf("%s/%s_results/count_matrix.mtx", result_dir, sample)
+  label_path <- sprintf("%s/%s_results/labels.tsv", result_dir, sample)
+  barcode_path <- sprintf("%s/%s_barcode.tsv", barcode_dir, sample)
+  check_files <- file.exists(c(result_path, label_path, barcode_path))
+  if (any(!check_files)){return("Invalid file")}
+  
+  suppressMessages(tryCatch({
+    df <- scHLA_import(sample = sample, 
+                       result_path = result_path,
+                       label_path = label_path,
+                       barcode_path = barcode_path)
+    
+    df <- apply_allele_order(label_path = label_path,
+                             data = df)
+    
+    gene_sums_and_ratio(df)
+  }, error = function(c) NA))
+}
 
 
 
+scHLA_data_processing(
+  sample="INCOV005-BL_S7",
+  result_dir=sprintf("%s/scHLAcount/output/invitro", isb_path),
+  barcode_dir=sprintf("%s/scHLAcount/barcodes", isb_path)
+)
