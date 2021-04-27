@@ -5,6 +5,7 @@ output: html_notebook
 
 ```{r}
 library(tidyverse)
+library(meta)
 source("data_import_functions.R")
 all_hla_expanded <- readRDS("all_hla_expanded.RDS")
 ```
@@ -145,7 +146,7 @@ srt %>%
   scale_color_gradient2(high = "red", mid = "grey80", low = "blue", midpoint = 0.5, na.value = "transparent")
 ```
 ```{r, fig.width = 9, fig.height = 4}
-samp <- "INCOV007-BL"
+samp <- "INCOV028-BL"
 scHLAcount_dir <- sprintf("%s/scHLAcount", isb_path)
 
 # Create tibble of all genotyper and sample combinations
@@ -184,5 +185,84 @@ srt %>%
   scale_color_gradient(high = "red", low = "blue", na.value = "transparent")
 
 
-# WHERE IS OPTITYPE
+# Some OK examples
+# "INCOV028-BL"
 ```
+
+# Meta-analysis approach
+
+```{r}
+sc_meta <- function(df){
+  m <- metabin(event.e = observed, n.e = gene_sum_typed, event.c = expected, n.c = gene_sum_typed,
+        data = df,
+        method = "Inverse",
+        incr = 0.1,
+        sm = "OR")
+  data.frame(summary(m)$random) %>% 
+    select(TE, seTE, lower, upper) %>% 
+    mutate_all(exp)
+}
+```
+
+
+```{r}
+samp <- "INCOV02[0-9]-BL"
+x <- allele_data <- tibble(genotyper = c("invitro", "arcasHLA", "optitype", "phlat", "hlaminer")) %>% 
+  mutate(data = map(genotyper, function(x) suppressMessages(read_tsv("../../covid/isb/scHLAcount/BL_fastq_files.txt", col_names = "sample")))) %>% 
+  unnest(data) %>% 
+  filter(grepl(samp, sample)) %>% 
+  # Import data based on sample and genotyper
+  mutate(result_path = sprintf("%s/output/%s",scHLAcount_dir, genotyper),
+         barcode_path = sprintf("%s/barcodes", scHLAcount_dir)) %>% 
+  # head(2) %>%
+  mutate(data = pmap(list(sample, result_path, barcode_path), function(s,r,b){
+    scHLA_data_processing(
+      sample=s,
+      result_dir=r,
+      barcode_dir=b
+    )
+  })) %>% unnest(data)
+
+y <- x %>% 
+  mutate(sample = gsub("_[A-Z][0-9]$","",sample)) %>% 
+  # # filter(n_alleles_observed == 2, grepl("^D[PQR]", gene), sampleID %in% c("INCOV003-AC", "INCOV024-AC")) %>% 
+  # select(cell, locus, count, gene_sum_typed, celltype) %>% 
+  # group_by(severity, celltype, gene) %>% 
+  filter(locus == "A") %>% 
+  group_by(sample, genotyper) %>% 
+  sample_n(500, replace = T) %>%
+  mutate(complement = gene_sum_typed - count, expected = 0.5*gene_sum_typed) %>% 
+  rowwise() %>% 
+  mutate(observed = max(across(c(count, complement)))) %>% 
+  group_by(sample, genotyper) %>% 
+  nest() %>% 
+  mutate(data = map(data, sc_meta)) %>% 
+  unnest(data)
+```
+
+```{r, fig.width = 12, fig.height = 4}
+y %>%
+  mutate(genotyper = factor(genotyper, levels = c("hlaminer","phlat","optitype","arcasHLA","invitro"))) %>% 
+  ggplot(aes(x = genotyper, y = TE, ymin = lower, ymax = upper))+
+  geom_point()+
+  geom_errorbar()+
+  geom_hline(yintercept = 1, linetype = "dashed")+
+  facet_grid(.~sample, scales = "free")+
+  theme_bw()+
+  theme(axis.text.x = element_text(angle = 90)) +
+  coord_flip() +
+  labs(y = "Odds ratio of dominant allele", x= NULL)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
