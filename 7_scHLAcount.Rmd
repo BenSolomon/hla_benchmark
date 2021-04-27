@@ -106,13 +106,22 @@ srt %>%
 ```
 
 ```{r}
+
+```
+
+```{r}
+
+```
+
+```{r, fig.width = 9, fig.height = 8}
+samp <- "INCOV008-BL"
 scHLAcount_dir <- sprintf("%s/scHLAcount", isb_path)
 
 # Create tibble of all genotyper and sample combinations
-z <- tibble(genotyper = c("invitro", "arcasHLA", "optitype", "phlat", "hlaminer")) %>% 
+allele_data <- tibble(genotyper = c("invitro", "arcasHLA", "optitype", "phlat", "hlaminer")) %>% 
   mutate(data = map(genotyper, function(x) suppressMessages(read_tsv("../../covid/isb/scHLAcount/BL_fastq_files.txt", col_names = "sample")))) %>% 
   unnest(data) %>% 
-  filter(sample == "INCOV005-BL_S7") %>% 
+  filter(grepl(samp, sample)) %>% 
   # Import data based on sample and genotyper
   mutate(result_path = sprintf("%s/output/%s",scHLAcount_dir, genotyper),
          barcode_path = sprintf("%s/barcodes", scHLAcount_dir)) %>% 
@@ -124,25 +133,10 @@ z <- tibble(genotyper = c("invitro", "arcasHLA", "optitype", "phlat", "hlaminer"
       barcode_dir=b
     )
   })) %>% unnest(data) 
-# %>% 
-  # Remove remaining data column caused by missing files,
-  # then remove the NAs representing those files
-  # select(-data) %>% drop_na()
 
-# showConnections()
-z
-
-scHLA_data_processing("INCOV003-BL_S5", "/labs/khatrilab/solomonb/covid/isb/scHLAcount/output/invitro", "/labs/khatrilab/solomonb/covid/isb/scHLAcount/barcodes")
-```
-
-```{r}
-
-```
-
-```{r, fig.width = 9, fig.height = 8}
 srt %>% 
-  filter(sampleID == "INCOV005-BL") %>% 
-  left_join(z %>% filter(locus == "A"), by = "cell") %>% 
+  filter(sampleID == samp) %>% 
+  left_join(allele_data %>% filter(locus == "A"), by = "cell") %>% 
   filter(!is.na(allele)) %>% 
     ggplot(aes(x = UMAP_1, y = UMAP_2, color = allele_ratio)) +
   geom_point(size = 0.5, alpha = 0.5)+
@@ -150,7 +144,45 @@ srt %>%
   facet_grid(genotyper~allele)+
   scale_color_gradient2(high = "red", mid = "grey80", low = "blue", midpoint = 0.5, na.value = "transparent")
 ```
+```{r, fig.width = 9, fig.height = 4}
+samp <- "INCOV007-BL"
+scHLAcount_dir <- sprintf("%s/scHLAcount", isb_path)
+
+# Create tibble of all genotyper and sample combinations
+allele_data <- tibble(genotyper = c("invitro", "arcasHLA", "optitype", "phlat", "hlaminer")) %>% 
+  mutate(data = map(genotyper, function(x) suppressMessages(read_tsv("../../covid/isb/scHLAcount/BL_fastq_files.txt", col_names = "sample")))) %>% 
+  unnest(data) %>% 
+  filter(grepl(samp, sample)) %>% 
+  # Import data based on sample and genotyper
+  mutate(result_path = sprintf("%s/output/%s",scHLAcount_dir, genotyper),
+         barcode_path = sprintf("%s/barcodes", scHLAcount_dir)) %>% 
+  # head(2) %>%
+  mutate(data = pmap(list(sample, result_path, barcode_path), function(s,r,b){
+    scHLA_data_processing(
+      sample=s,
+      result_dir=r,
+      barcode_dir=b
+    )
+  })) %>% unnest(data) %>% 
+  select(genotyper, cell, locus, allele_order, allele_ratio) %>% 
+  # group_by(genotyper, cell, allele_order) %>%  mutate(test = length(allele_order))
+  pivot_wider(names_from = "allele_order", values_from = "allele_ratio", names_prefix = "allele_") %>% 
+  rowwise() %>% 
+  mutate(max_ratio = max(across(contains("allele_")), na.rm = T)) %>% 
+  select(genotyper, cell, locus, max_ratio)
 
 
+srt %>% 
+  filter(sampleID == samp) %>% 
+  left_join(allele_data %>% filter(locus == "A"), by = "cell") %>% 
+  mutate(genotyper = fct_relevel(genotyper, "invitro")) %>% 
+  filter(!is.na(genotyper)) %>%
+    ggplot(aes(x = UMAP_1, y = UMAP_2, color = max_ratio)) +
+  geom_point(size = 0.5, alpha = 0.5)+
+  theme_bw() +
+  facet_grid(.~genotyper)+
+  scale_color_gradient(high = "red", low = "blue", na.value = "transparent")
 
-# Meta analysis
+
+# WHERE IS OPTITYPE
+```
