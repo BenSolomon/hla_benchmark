@@ -3,3 +3,95 @@ title: "6) Accuracy on 3' 10X platform and bulk"
 output: html_notebook
 ---
 
+```{r, message=F}
+library(tidyverse)
+library(ggh4x)
+library(patchwork)
+source("data_import_functions.R")
+source("accuracy_functions.R")
+source("ggplot_layouts.R")
+isb_path <- "/labs/khatrilab/solomonb/covid/isb"
+isb_samples <- read_tsv("/labs/khatrilab/solomonb/covid/isb/logs/210217_232725/parallel.log") %>% 
+  separate(Command, into = c(NA, "sample"), sep = " ") %>% 
+  pull(sample) %>% unique()
+```
+
+```{r}
+x <- invitro_import(path = "pmid30518681_scisco_hla.tsv", exclude_comment_samples = T)
+```
+
+```{r}
+x <- combine_HLA_import(
+  path = "/labs/khatrilab/solomonb/covid/pmid30518681/scRNA/",
+  samples = "SRR7881399",
+  invitro_path = "pmid30518681_scisco_hla.tsv",
+  filter_invitro = T
+) %>% 
+  rename(original_name = sample) %>% 
+  mutate(original_name = gsub("^STU-HD-","",original_name)) %>% 
+  # mutate(sra = ifelse(grepl("^SRR", original_name), original_name, NA)) %>% 
+  left_join(
+    read_csv("/labs/khatrilab/solomonb/covid/pmid30518681/pmid30518681_samples.csv"),
+    by = c("original_name" = "sra")
+  ) %>% 
+  mutate(sample = ifelse(is.na(sample), original_name, sample)) %>% 
+  select(-original_name, -platform)
+x
+```
+
+```{r}
+pmid_hla <- format_hla_table(x)
+pmid_hla
+```
+
+```{r}
+pmid_arcas <- pmid_hla %>% filter(genotyper == "arcasHLA") %>% pull(sample) %>% unique()
+
+prediction_frequency <- pmid_hla %>% 
+  filter(sample %in% pmid_arcas) %>% 
+  select(-allele_id) %>% 
+  pivot_longer(cols = field_1:field_3, names_to = "field", values_to = "allele") %>% 
+  pivot_wider(names_from = "genotyper", values_from = "allele", values_fn = function(x) sum(!is.na(x)), values_fill = 0) %>% 
+  # filter(invitro != 0) %>% 
+  ### NEED TO DEAL WITH HLAMINER AMBIGOUS ALLELES
+  # mutate_at(vars(arcasHLA:hlaminer), funs(./invitro)) %>% 
+  mutate_at(vars(arcasHLA), funs(./2)) %>% 
+  select(-invitro) %>% 
+  ungroup() %>% 
+  pivot_longer(cols = arcasHLA, names_to = "genotyper", values_to = "frequency")
+
+prediction_frequency %>% 
+  filter(grepl("^[ABC]", locus)) %>% 
+  gg_frequency()
+```
+
+### Success
+```{r}
+success_df <- compare_hla(hla_df = pmid_hla %>% filter(sample %in% pmid_arcas), 
+            reference = "invitro", 
+            exclude_missing = T, 
+            compare_function = "accuracy") 
+
+success_df%>% 
+  filter(grepl("^[ABC]", locus)) %>% 
+  gg_accuracy() +
+  ylab("Success")
+```
+
+### Accuracy
+
+```{r}
+accuracy_df <- compare_hla(hla_df = pmid_hla %>% filter(sample %in% pmid_arcas), 
+            reference = "invitro", 
+            exclude_missing = F, 
+            compare_function = "accuracy") 
+
+ accuracy_df%>% 
+  filter(grepl("^[ABC]", locus)) %>% 
+  gg_accuracy()
+```
+
+
+
+
+

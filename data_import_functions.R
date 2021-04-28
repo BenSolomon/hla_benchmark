@@ -13,7 +13,7 @@ invitro_import <- function(path = "hla_2020-10-23_1457.tsv", exclude_comment_sam
   if (exclude_comment_samples == T){
     exclude_samples <- df %>% filter(!is.na(Comments)) %>% pull(`Sample ID`) %>% unique()
     print(
-      sprintf("The following samples were removed due to comments: %s", 
+      sprintf("The following samples were removed from invitro typing due to comments: %s", 
               paste(exclude_samples, collapse = " "))
       )
     df <- df %>% filter(is.na(Comments))
@@ -122,9 +122,9 @@ hlaminer_import <- function(path, sample){
 
 
 ### Combined import function
-combine_HLA_import <- function(path, samples){
+combine_HLA_import <- function(path, samples, invitro_path="hla_2020-10-23_1457.tsv", filter_invitro = F){
   suppressMessages({
-    invitro <- invitro_import()
+    invitro <- invitro_import(path = invitro_path, exclude_comment_samples = filter_invitro)
     
     arcas <- arcas_import(path = sprintf("%s/arcasHLA", path))
     
@@ -151,6 +151,7 @@ combine_HLA_import <- function(path, samples){
   })
 }
 
+# x <- combine_HLA_import(path = isb_path, samples = isb_samples[1:10], filter_invitro = T)
 # x <- combine_HLA_import(path = isb_path, samples = isb_samples)
 
 
