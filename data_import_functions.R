@@ -7,8 +7,19 @@ library(tidyverse)
 #   pull(sample) %>% unique()
 
 ### Import ISB molecular genotyping
-invitro_import <- function(path = "/local-scratch/datasets/ISBOtherCovid/hla-haplotyping/scisco-genetics/data/hla_2020-10-23_1457.tsv"){
-  read_tsv(path) %>% 
+invitro_import <- function(path = "hla_2020-10-23_1457.tsv", exclude_comment_samples=F){
+  df <- read_tsv(path)
+  # Remove samples with comments (e.g. Sample contamination)
+  if (exclude_comment_samples == T){
+    exclude_samples <- df %>% filter(!is.na(Comments)) %>% pull(`Sample ID`) %>% unique()
+    print(
+      sprintf("The following samples were removed due to comments: %s", 
+              paste(exclude_samples, collapse = " "))
+      )
+    df <- df %>% filter(is.na(Comments))
+  }
+  # Format data
+  df %>% 
     select(`Sample ID`, `Allele 1`, `Allele 2`) %>%
     pivot_longer(cols = !`Sample ID`, names_to = "allele_id", values_to = "allele") %>% 
     filter(!grepl("Not_Present", allele)) %>% 
@@ -16,7 +27,7 @@ invitro_import <- function(path = "/local-scratch/datasets/ISBOtherCovid/hla-hap
            genotyper = "invitro") %>% 
     rename("sample" = "Sample ID")
 }
-invitro_import()
+# invitro_import()
 
 
 ### Run arcasHLA merge
