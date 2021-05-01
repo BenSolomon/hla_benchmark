@@ -22,6 +22,8 @@ all_hla <- format_hla_table(combine_HLA_import(path = isb_path, samples = isb_sa
 # typed_hla <- all_hla %>% 
 #   filter(grepl("^[ABCD]", locus), sample %in% all_samples)
 ```
+
+
 # Calculations
 
 ### Prediction frequency
@@ -73,12 +75,20 @@ all_hla_expanded <- all_hla %>%
 
 ### Plots to compare original and expanded
 
-```{r}
-p1 <- hla_compare_woNA %>% 
+```{r, fig.height=8}
+original <- format_hla_table(combine_HLA_import(path = isb_path, samples = isb_samples, expand_invitro = F))
+expanded <- format_hla_table(combine_HLA_import(path = isb_path, samples = isb_samples, expand_invitro = T))
+
+original <- compare_hla(hla_df = original, reference = "invitro", exclude_missing = F, compare_function = "accuracy")
+expanded <- compare_hla(hla_df = expanded, reference = "invitro", exclude_missing = F, compare_function = "accuracy")
+
+
+p1 <- original %>% 
   filter(grepl("^[ABC]", locus)) %>% 
   gg_accuracy() +
   ggtitle("MHC1 loci accuracy", subtitle = "Missing predictions excluded")
-p2 <- compare_hla(hla_df = all_hla_expanded %>% filter(grepl("BL$", sample)), reference = "invitro", exclude_missing = F, compare_function = "accuracy") %>% 
+p2 <- expanded %>% 
+  filter(grepl("BL$", sample)) %>% 
   filter(grepl("^[ABC]", locus)) %>% 
   gg_accuracy() +
   ggtitle("MHC1 loci accuracy", subtitle = "Missing predictions excluded")

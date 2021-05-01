@@ -122,32 +122,48 @@ hlaminer_import <- function(path, sample){
 
 
 ### Combined import function
-combine_HLA_import <- function(path, samples, invitro_path="hla_2020-10-23_1457.tsv", filter_invitro = F){
+combine_HLA_import <- function(path, samples, invitro_path="hla_2020-10-23_1457.tsv", filter_invitro = F, expand_invitro = T){
   suppressMessages({
     invitro <- invitro_import(path = invitro_path, exclude_comment_samples = filter_invitro)
     
-    arcas <- arcas_import(path = sprintf("%s/arcasHLA", path))
+    ### Every subject has molecular HLA typing, but may occur in the BL, AC, or CV timepoint
+    ### This expands the molecular HLA typing from the timepoint it occurs to all other time points 
+    ### This allows for scRNA genotyping from a given subject and timepoint to be assessed even if that
+    ### subjects molecular typing happened at a different time point. Since HLA is genetic, the molecular
+    ### typing should not change
+    if (expand_invitro == T){
+      subjects <- invitro %>% pull(sample) %>% str_replace("-.*$","") %>% unique()
+      timepoints <- invitro %>% pull(sample) %>% str_replace("^.*-","") %>% unique()
+      invitro <- expand_grid(sample = subjects, time = timepoints) %>% 
+        left_join(invitro %>% 
+                    separate(sample, into = c("sample", NA), sep = "-"),
+                  by = "sample") %>% 
+        unite("sample", sample, time, sep = "-")
+    }
     
-    phlat <- tibble(sample = samples) %>% 
+    arcas <- arcas_import(path = sprintf("%s/arcasHLA", path))
+
+    phlat <- tibble(sample = samples) %>%
       mutate(data = map(sample, function(x) {
         phlat_import(path = sprintf("%s/phlat", path), sample = x)
-      })) %>% 
+      })) %>%
       unnest(data)
-    
-    opti <- tibble(sample = samples) %>% 
+
+    opti <- tibble(sample = samples) %>%
       mutate(data = map(sample, function(x) {
         optitype_import(path = sprintf("%s/optitype", path), sample = x)
-      })) %>% 
+      })) %>%
       unnest(data)
-    
-    miner <- tibble(sample = samples) %>% 
+
+    miner <- tibble(sample = samples) %>%
       mutate(data = map(sample, function(x) {
         hlaminer_import(path = sprintf("%s/hla_miner", path), sample = x)
-      })) %>% 
+      })) %>%
       unnest(data)
-    
-    bind_rows(arcas, phlat, opti, miner, invitro) %>% 
-      drop_na()
+
+    bind_rows(arcas, phlat, opti, miner, invitro) %>%
+      drop_na() %>% 
+      filter(sample %in% samples)
   })
 }
 
