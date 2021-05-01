@@ -21,9 +21,10 @@ x <- invitro_import(path = "pmid30518681_scisco_hla.tsv", exclude_comment_sample
 ```
 
 ```{r}
+# read_lines("/labs/khatrilab/solomonb/covid/pmid30518681/scRNA/SRR_Acc_List.txt")
 x <- combine_HLA_import(
   path = "/labs/khatrilab/solomonb/covid/pmid30518681/scRNA/",
-  samples = "SRR7881399",
+  samples = read_lines("/labs/khatrilab/solomonb/covid/pmid30518681/scRNA/SRR_Acc_List.txt"),
   invitro_path = "pmid30518681_scisco_hla.tsv",
   filter_invitro = T
 ) %>% 
