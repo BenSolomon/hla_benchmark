@@ -16,11 +16,7 @@ isb_samples <- read_tsv("/labs/khatrilab/solomonb/covid/isb/logs/210217_232725/p
 ```
 
 ```{r}
-all_hla <- format_hla_table(combine_HLA_import(path = isb_path, samples = isb_samples)) %>% filter(sample %in% isb_samples)
-
-# all_samples <- read_tsv(sprintf("%s/all_samples.txt", isb_path), col_names = "sample") %>% pull(sample)
-# typed_hla <- all_hla %>% 
-#   filter(grepl("^[ABCD]", locus), sample %in% all_samples)
+all_hla <- format_hla_table(combine_HLA_import(path = isb_path, samples = isb_samples, expand_invitro = T))
 ```
 
 
@@ -51,31 +47,12 @@ hla_compare_woNA <- compare_hla(hla_df = all_hla, reference = "invitro", exclude
 
 ### Updated accuracy with expanded HLA
 
-```{r}
+```{r, fig.height=8}
 ### Every subject has molecular HLA typing, but may occur in the BL, AC, or CV timepoint
 ### This expands the molecular HLA typing from the timepoint it occurs to all other time points 
 ### This allows for scRNA genotyping from a given subject and timepoint to be assessed even if that
 ### subjects molecular typing happened at a different time point. Since HLA is genetic, the molecular
 ### typing should not change
-
-all_hla_expanded <- all_hla %>% 
-  group_by(sample, genotyper) %>% 
-  nest() %>% 
-  filter(genotyper == "invitro") %>% 
-  separate(sample, into = c("sample",NA), sep = "-") %>% 
-  right_join(all_hla %>% 
-               select(sample) %>% 
-               distinct() %>% 
-               separate(sample, into = c("sample","time"), sep = "-"),
-             by = "sample") %>% 
-  unnest(data) %>% 
-  unite(sample, sample, time, sep = "-") %>% 
-  bind_rows(all_hla %>% filter(genotyper != "invitro"))
-```
-
-### Plots to compare original and expanded
-
-```{r, fig.height=8}
 original <- format_hla_table(combine_HLA_import(path = isb_path, samples = isb_samples, expand_invitro = F))
 expanded <- format_hla_table(combine_HLA_import(path = isb_path, samples = isb_samples, expand_invitro = T))
 
@@ -86,12 +63,12 @@ expanded <- compare_hla(hla_df = expanded, reference = "invitro", exclude_missin
 p1 <- original %>% 
   filter(grepl("^[ABC]", locus)) %>% 
   gg_accuracy() +
-  ggtitle("MHC1 loci accuracy", subtitle = "Missing predictions excluded")
+  ggtitle("MHC1 loci accuracy", subtitle = "Original in vitro vs. sample pairing")
 p2 <- expanded %>% 
   filter(grepl("BL$", sample)) %>% 
   filter(grepl("^[ABC]", locus)) %>% 
   gg_accuracy() +
-  ggtitle("MHC1 loci accuracy", subtitle = "Missing predictions excluded")
+  ggtitle("MHC1 loci accuracy", subtitle = "Expanded HLA invitro vs. sample pairings. BL only")
 p1/p2
 ```
 
