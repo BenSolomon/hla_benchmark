@@ -4,11 +4,13 @@ library(ggh4x)
 
 gg_accuracy <- function(df){
   df %>% 
-    ggplot(aes(x = field, y = accuracy))+
+    mutate(genotyper = fct_relevel(genotyper, "arcasHLA", "phlat", "optitype", "hlaminer")) %>% 
+    ggplot(aes(x = genotyper, y = accuracy))+
     stat_summary(fun = mean, geom = "point", position = position_dodge(width=0.9)) +
     stat_summary(fun.data = mean_se, geom = "errorbar", position=position_dodge(width=0.9)) +
     theme_bw() +
-    facet_nested(.~locus+genotyper, scales = "free_y") +
+    # facet_nested(.~locus+field, scales = "free_y") +
+    facet_grid(field~locus, scales = "free") +
     coord_cartesian(ylim = c(0,1))+
     scale_y_continuous(n.breaks = 6)+
     labs(y = "Accuracy", x = "")+
@@ -19,11 +21,13 @@ gg_accuracy <- function(df){
 
 gg_frequency <- function(df){
   df %>% 
+    mutate(genotyper = fct_relevel(genotyper, "arcasHLA", "phlat", "optitype", "hlaminer")) %>% 
     ggplot(aes(x = genotyper, y = frequency))+
     stat_summary(fun = mean, geom = "point", position = position_dodge(width=0.9)) +
     stat_summary(fun.data = mean_se, geom = "errorbar", position=position_dodge(width=0.9)) +
     theme_bw() +
-    facet_nested(.~locus+field, scales = "free_y") +
+    # facet_nested(.~locus+field, scales = "free_y") +
+    facet_grid(field~locus, scales = "free") +
     coord_cartesian(ylim = c(0,1))+
     scale_y_continuous(n.breaks = 6)+
     labs(y = "Prediction frequency", x = "")+
