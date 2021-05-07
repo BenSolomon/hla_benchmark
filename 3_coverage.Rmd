@@ -2,6 +2,12 @@
 title: "3) Coverage Analysis"
 output: html_notebook
 ---
+# TO DO
+### CHECK PREDICTION IMPORT FUNCTIONS ACCURATE FOR SUBSAMPLE
+### CHECK LABELING OF OBJECTS FOR READ VS. CELL COVERAGE
+### MOVE STABLE HELPERS TO HELPER SCRIPTS
+### CONSISTENT ORIGINAL VS. SUBSAMPLE WORKFLOW
+
 
 # Startup 
 ```{r}
@@ -123,6 +129,16 @@ annotate_model <- list(
                   size = 4
   ))
 ```
+### Calculate accuracy as in 1_accuracy.Rmd
+
+```{r,message = F, warning=F}
+invitro_hla <- format_hla_table(invitro_import("/labs/khatrilab/solomonb/hla_project/hla_benchmark/hla_2020-10-23_1457.tsv"))
+all_hla <- format_hla_table(combine_HLA_import(path = isb_path, samples = isb_samples, expand_invitro = T))
+accuracy_df <- compare_hla(hla_df = all_hla, 
+            reference = "invitro", 
+            exclude_missing = F, 
+            compare_function = "accuracy") 
+```
 
 # Import arcas logs
 ```{r}
@@ -142,10 +158,10 @@ alignment_stats <- tibble(sample = isb_samples) %>%
 ```{r}
 read_length <- 91
 coverage_full_plot <- accuracy_df %>% 
-  left_join(alignment_stats_df, by = c("sample", "locus")) %>% 
+  left_join(alignment_stats, by = c("sample", "locus")) %>% 
   left_join(hla_loci_length_df, by = "locus") %>%
-  mutate_at(vars(c(reads, classes, bp)), as.numeric) %>% 
-  mutate(coverage = (reads * 91)/bp) %>% 
+  mutate_at(vars(c(locus_reads, bp)), as.numeric) %>% 
+  mutate(coverage = (locus_reads * 91)/bp) %>% 
   filter(grepl("^[ABC]", locus) & grepl("-(AC|BL)$", sample) & field == "field_2" & genotyper != "hlaminer") %>% 
   ggplot(aes(x = log10(coverage), y = accuracy, color = genotyper))+
   geom_smooth(method = "lm")+
@@ -157,7 +173,7 @@ coverage_full_plot <- accuracy_df %>%
   theme(panel.spacing = unit(0.1,"line")) +
   scale_color_brewer(palette = "Dark2")
 
-add_points(coverage_full_plot)
+coverage_full_plot
 ```
 ### Keys to link samples to number of cells ine ach
 ```{r}
@@ -181,11 +197,11 @@ cell_key <- tibble(line = system("wc -l ~/solomonb/covid/isb/extracted_barcodes/
 ```{r}
 read_length <- 91
 cells_full_plot <- accuracy_df %>% 
-  left_join(alignment_stats_df, by = c("sample", "locus")) %>% 
+  left_join(alignment_stats, by = c("sample", "locus")) %>% 
   left_join(hla_loci_length_df, by = "locus") %>%
   left_join(cell_key, by = "sample") %>%
-  mutate_at(vars(c(reads, classes, bp, n_cells)), as.numeric) %>% 
-  mutate(coverage = (reads * 91)/bp) %>% 
+  mutate_at(vars(c(locus_reads, bp, n_cells)), as.numeric) %>% 
+  mutate(coverage = (locus_reads * 91)/bp) %>% 
   filter(grepl("^[ABC]", locus) & grepl("-(AC|BL)$", sample) & field == "field_2" & genotyper != "hlaminer") %>% 
   ggplot(aes(x = log10(n_cells), y = accuracy, color = genotyper))+
   geom_smooth(method = "lm")+
@@ -197,7 +213,7 @@ cells_full_plot <- accuracy_df %>%
   theme(panel.spacing = unit(0.1,"line")) +
   scale_color_brewer(palette = "Dark2")
 
-add_points(cells_full_plot)
+cells_full_plot
 ```
 ### Composite full sample plot
 ```{r, fig.width = 10, fig.height = 4}
@@ -239,6 +255,13 @@ read_subsample_df <- hla_df %>%
 
 ### Import read subsample arcas logs
 ```{r}
+hla_stats <- expand_grid(sample = samples, subset = c("S01", "S001", "S0001")) %>% 
+  mutate(filepath = sprintf("%s/logs/210408_151443/%s/%s_%s_arcas_genotype.log", path, sample, sample, subset)) %>% 
+  mutate(data = map(filepath, function(x){
+    parse_arcas_log(x)
+  })) %>% 
+  unnest(data)
+
 all_stats <- hla_stats %>% 
   bind_rows(alignment_stats %>% mutate(subset = "S1")) %>% 
   mutate(locus = gsub("HLA-", "", locus))
@@ -295,7 +318,6 @@ path <- "/labs/khatrilab/solomonb/covid/isb/subsample_cells"
 samples <- list.dirs(sprintf("%s/logs/210410_181059", path), recursive = F, full.names = F)
 hla_df <- format_hla_table(combine_HLA_import(path = path, samples = samples))
 
-invitro_hla <- format_hla_table(invitro_import("/labs/khatrilab/solomonb/hla_project/hla_benchmark/hla_2020-10-23_1457.tsv"))
 cell_subsample_df <- hla_df %>% 
   bind_rows(
     expand_grid(sample = unique(invitro_hla$sample), subset = c("C01","C001","C0005")) %>% 
