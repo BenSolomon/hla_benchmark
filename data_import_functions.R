@@ -287,8 +287,8 @@ scHLA_data_processing <- function(sample, result_dir, barcode_dir){
 
 
 
-scHLA_data_processing(
-  sample="INCOV005-BL_S7",
-  result_dir=sprintf("%s/scHLAcount/output/invitro", isb_path),
-  barcode_dir=sprintf("%s/scHLAcount/barcodes", isb_path)
-)
+# scHLA_data_processing(
+#   sample="INCOV005-BL_S7",
+#   result_dir=sprintf("%s/scHLAcount/output/invitro", isb_path),
+#   barcode_dir=sprintf("%s/scHLAcount/barcodes", isb_path)
+# )
