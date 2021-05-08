@@ -28,22 +28,7 @@ for (l in c("A", "B", "C")){
 }
 
 ```
-```{r, fig.width = 17, fig.height = 2.75}
-plot_component <- plot_grid(
-  ggdraw()+draw_label("3) Heatmap by individuals", fontface = "bold", x=0, hjust = -0.2, size = 18),
-  A_plot + theme(axis.text.x = element_blank(), legend.position = "none"), 
-  B_plot + theme(axis.text.x = element_blank(), legend.position = "none"), 
-  C_plot + theme(axis.text.x = element_blank(), legend.position = "none"),
-  # ggplot()+geom_text(aes(x=1,y=1,label="Samples")) + theme_void(),
-  ggdraw()+draw_label("Samples"),
-  ncol = 1,
-  rel_heights = c(1,1,1,1,0.4),
-  labels = c("","HLA-A", "HLA-B", "HLA-C")
-)
-legend_component <- get_legend(A_plot + guides(color = guide_legend(ncol = 1)) + theme(legend.position = "right"))
-plot_grid(plot_component, legend_component, nrow = 1, rel_widths = c(0.95, .05))
-```
-# Balloon plot
+# Summarized heatmap
 
 ```{r}
 plt <- accuracy_df %>% 
@@ -74,6 +59,7 @@ plt +
   ggtitle("4) Summarized heatmap")
 ```
 
+# Original plot
 
 ```{r, fig.height = 6, fig.width = 4}
 accuracy_df %>% 
@@ -92,6 +78,9 @@ accuracy_df %>%
     theme(panel.spacing = unit(0.1,"line")) +
   ggtitle("1) Original Plot")
 ```
+
+# Barplot
+
 ```{r, fig.width = 12, fig.height = 4}
 accuracy_df %>% 
   filter(grepl("^[ABC]", locus)) %>% 
@@ -105,6 +94,145 @@ accuracy_df %>%
   labs(x = "") +
   ggtitle("2) Adjacent bar plot")
 ```
+
+# Individual heatmap
+
+```{r}
+cell_key <- tibble(line = system("wc -l ~/solomonb/covid/isb/extracted_barcodes/INCOV*", intern = T)) %>% 
+  separate(line, into = c("n_cells", "file"), sep = " /") %>% 
+  drop_na() %>% 
+  mutate(sample = gsub("\\..*","",basename(file))) %>% 
+  select(-file)
+```
+
+# Import arcas logs
+```{r}
+alignment_stats <- tibble(sample = isb_samples) %>% 
+  mutate(data = map(sample, function(x){
+    log_path <- sprintf("%s/logs/210309_155222/%s/%s_arcas_genotype.log",isb_path,x,x)
+    parse_arcas_log(log_path)
+  })) %>%
+  unnest(data) %>% 
+  select(-data) %>% 
+  separate(locus, into = c(NA, "locus"), sep = "-")
+alignment_stats <- alignment_stats %>% 
+  select(sample, all_reads_mapped) %>% 
+  distinct()
+```
+
+```{r,fig.width = 16, fig.height = 6}
+heatmap_df <- accuracy_df %>% 
+  ungroup() %>% 
+  left_join(cell_key, by = "sample") %>% 
+  left_join(alignment_stats, by = "sample") %>% 
+  mutate(n_cells = as.numeric(n_cells)) %>% 
+  filter(grepl("-BL$", sample))
+  
+all_samples <- heatmap_df %>% pull(sample) %>% unique() %>% sort()
+  
+accuracy_heat <- heatmap_df %>% 
+  filter(field == "field_2") %>%
+  right_join(tibble(sample = all_samples), by = "sample") %>% 
+  ggplot(aes(x=sample, y=genotyper, fill = accuracy))+
+  geom_tile()+
+  facet_grid(locus ~.) +
+  scale_fill_viridis_c(na.value = "transparent") +
+  theme(axis.text.x = element_text(angle = 90))
+
+cells_heat <- heatmap_df %>% 
+  select(sample, n_cells) %>% distinct() %>% 
+  right_join(tibble(sample = all_samples), by = "sample") %>% 
+  ggplot(aes(x=sample, y="a", fill = log10(n_cells)))+
+  geom_tile()+
+  scale_fill_viridis_c(na.value = "transparent") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank()) +
+  labs(y = "Cells")
+
+reads_heat <- heatmap_df %>% 
+  select(sample, all_reads_mapped) %>% distinct() %>% 
+  right_join(tibble(sample = all_samples), by = "sample") %>% 
+  ggplot(aes(x=sample, y="a", fill = log10(all_reads_mapped)))+
+  geom_tile()+
+  scale_fill_viridis_c(na.value = "transparent") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank()) +
+  labs(y = "Reads")
+
+plot_grid(
+  cells_heat+theme(axis.text.x = element_blank())+xlab(""),
+  reads_heat+theme(axis.text.x = element_blank())+xlab(""),
+  accuracy_heat+theme(axis.text.x = element_blank()),
+  ncol = 1,
+  rel_heights = c(2,2,16),
+  align = "v", axis = "lr"
+)
+```
+
+# Allele heatmaps
+
+```{r}
+accuracy_df %>% 
+  unnest(reference) %>% 
+  filter(locus == "A", field == "field_2") %>% 
+  mutate(match = map2_dbl(reference, allele, function(x,y) sum(x %in% y, na.rm = t))) %>% 
+  group_by(reference, genotyper) %>% 
+  summarise(accuracy = mean(match)) %>% 
+  ggplot(aes(x=reference, y=genotyper, fill = accuracy))+
+  geom_tile()+
+  # facet_grid(locus ~.) +
+  scale_fill_viridis_c(na.value = "transparent") +
+  theme(axis.text.x = element_text(angle = 90))
+
+```
+
+
+```{r, fig.width = 12, fig.height = 6}
+accuracy_df %>% 
+  unnest(reference) %>% 
+  filter(grepl("^[ABC]", locus), field == "field_2") %>%
+  # filter(field == "field_2") %>% 
+  mutate(match = map2_dbl(reference, allele, function(x,y) sum(x %in% y, na.rm = t))) %>% 
+  group_by(locus, reference, genotyper) %>% 
+  summarise(accuracy = mean(match), n = n()) %>%
+  ggballoonplot(y = "genotyper", 
+                x = "reference", 
+                fill = "accuracy", 
+                size = "n",
+                facet.by = "locus") +
+  scale_fill_viridis_c(option = "C") +
+  scale_size_continuous(breaks = c(5,25,50,100), range = c(1,10)) +
+  facet_wrap(~locus, scales = "free_x", ncol = 1)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
