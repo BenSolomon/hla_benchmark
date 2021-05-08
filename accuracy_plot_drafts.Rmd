@@ -1,0 +1,110 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+library(ggcorrplot)
+library(cowplot)
+library(ggpubr)
+```
+# All sample heatmap
+```{r, fig.width = 16, fig.height = 2}
+for (l in c("A", "B", "C")){
+  plt <- accuracy_df %>% 
+    ungroup() %>% 
+    filter(locus == l & grepl("BL$", sample) & field == "field_2") %>% 
+    select(sample, genotyper, accuracy) %>% 
+    pivot_wider(names_from = "genotyper", values_from = "accuracy", values_fill = 0) %>% 
+    column_to_rownames("sample") %>% 
+    select(rev(c("arcasHLA", "optitype", "phlat", "hlaminer"))) %>% 
+    # t() %>% 
+    ggcorrplot::ggcorrplot(
+      
+    ) +
+    scale_fill_gradientn(colours = viridis::viridis(3))
+  assign(sprintf("%s_plot", l), plt)
+}
+
+```
+```{r, fig.width = 17, fig.height = 2.75}
+plot_component <- plot_grid(
+  ggdraw()+draw_label("3) Heatmap by individuals", fontface = "bold", x=0, hjust = -0.2, size = 18),
+  A_plot + theme(axis.text.x = element_blank(), legend.position = "none"), 
+  B_plot + theme(axis.text.x = element_blank(), legend.position = "none"), 
+  C_plot + theme(axis.text.x = element_blank(), legend.position = "none"),
+  # ggplot()+geom_text(aes(x=1,y=1,label="Samples")) + theme_void(),
+  ggdraw()+draw_label("Samples"),
+  ncol = 1,
+  rel_heights = c(1,1,1,1,0.4),
+  labels = c("","HLA-A", "HLA-B", "HLA-C")
+)
+legend_component <- get_legend(A_plot + guides(color = guide_legend(ncol = 1)) + theme(legend.position = "right"))
+plot_grid(plot_component, legend_component, nrow = 1, rel_widths = c(0.95, .05))
+```
+# Balloon plot
+
+```{r}
+plt <- accuracy_df %>% 
+  group_by(locus, field, genotyper) %>% 
+  summarise(mean_accuracy = mean(accuracy),
+            inv_sd = 1-sd(accuracy)) %>% 
+  ungroup() %>% 
+  mutate(mean_accuracy = ifelse(mean_accuracy == 0, NA, mean_accuracy), 
+         inv_sd = ifelse(mean_accuracy == 0, NA, inv_sd),
+         locus = factor(locus, levels = sort(unique(locus), decreasing = T))) %>% 
+  # select(-field) %>% 
+  # pivot_wider(names_from = "genotyper", values_from = "accuracy") %>% 
+  # column_to_rownames("locus") %>% 
+  ggballoonplot(y = "locus", 
+                x = "genotyper", 
+                fill = "mean_accuracy", 
+                size = "inv_sd", 
+                facet.by = "field") +
+  scale_fill_viridis_c(option = "C")
+plt + 
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90))+
+  labs(x = "", fill = "Accuracy", size = "SD") +
+  scale_size_continuous(breaks = c(0.9,0.8,0.7,0.6), 
+                        labels = rev(c(0.9,0.8,0.7,0.6)),
+                        range = c(0,10)
+                        ) +
+  ggtitle("4) Summarized heatmap")
+```
+
+
+```{r, fig.height = 6, fig.width = 4}
+accuracy_df %>% 
+  filter(grepl("^[ABC]", locus)) %>% 
+  mutate(genotyper = fct_relevel(genotyper, "arcasHLA", "phlat", "optitype", "hlaminer")) %>% 
+    ggplot(aes(x = genotyper, y = accuracy))+
+    stat_summary(fun = mean, geom = "point", position = position_dodge(width=0.9)) +
+    stat_summary(fun.data = mean_se, geom = "errorbar", position=position_dodge(width=0.9), width = 0.5) +
+    theme_bw() +
+    # facet_nested(.~locus+field, scales = "free_y") +
+    facet_grid(field~locus, scales = "free") +
+    coord_cartesian(ylim = c(0,1))+
+    scale_y_continuous(n.breaks = 6)+
+    labs(y = "Accuracy", x = "")+
+    theme(axis.text.x = element_text(angle = 90))+
+    theme(panel.spacing = unit(0.1,"line")) +
+  ggtitle("1) Original Plot")
+```
+```{r, fig.width = 12, fig.height = 4}
+accuracy_df %>% 
+  filter(grepl("^[ABC]", locus)) %>% 
+  mutate(genotyper = fct_relevel(genotyper, "arcasHLA", "phlat", "optitype", "hlaminer")) %>% 
+  ggplot(aes(x = field, y = accuracy, fill = genotyper))+
+  stat_summary(fun = mean, geom = "bar", position = "dodge", color = "black")  +
+  stat_summary(fun.data = mean_se, geom = "errorbar", position=position_dodge(width = 0.9), width = 0.5) +
+  theme_bw()  +
+  scale_fill_brewer(palette = "Set1") +
+  facet_grid(.~locus) +
+  labs(x = "") +
+  ggtitle("2) Adjacent bar plot")
+```
+
+
+
