@@ -5,7 +5,7 @@ output: html_notebook
 
 # Startup
 
-```{r}
+```{r, message = F}
 library(tidyverse)
 library(tidymodels)
 library(patchwork)
@@ -25,74 +25,6 @@ arcas_log_dir <- sprintf("%s/logs/210309_155222",isb_path)
 alignment_stats_df <- hla_mapping_stats_import(isb_samples, arcas_log_dir)
 ```
 
-# DRB gene inclusion by threshold
-
-```{r}
-# Generate df with set of DRB genes determined for each sample from 
-# arcasHLA alignment vs. molecular typing
-drb_genes_df <- all_hla_expanded %>% 
-  filter(grepl("BL$", sample)) %>% # Limit to one time collection, so no repeats
-  select(sample, locus, genotyper) %>% 
-  filter(grepl("DRB", locus), genotyper %in% c("arcasHLA", "invitro")) %>% 
-  distinct() %>% 
-  group_by(genotyper, sample) %>% 
-  arrange(locus, .by_group = T) %>% 
-  summarise(locus = paste(locus, collapse = "-")) %>% 
-  pivot_wider(names_from = "genotyper", values_from = "locus", values_fill = NA) %>% 
-  drop_na()
-drb_genes_df
-```
-
-```{r}
-# Generates set of DRB genes with number of mapped reads reaching a 
-# specified threshold. Depends on alignment_stats_df
-DRB_relative_filter <- function(relative_var="reads", threshold=0.05){
-  alignment_stats_df %>% 
-  filter(grepl("DRB[1345]", locus)) %>% 
-  mutate_at(c('reads', 'classes'), as.numeric) %>% 
-  group_by(sample) %>% 
-  mutate(freq = round(!!sym(relative_var)/sum(!!sym(relative_var)), digits = 2)) %>% 
-  select(sample, locus, freq) %>% 
-  filter(freq >= threshold) %>% 
-  arrange(locus, .by_group = T) %>% 
-  summarise(locus = paste(locus, collapse = "-")) 
-}
-DRB_relative_filter()
-```
-
-```{r}
-DRB_threshold_accuracy <- tibble(relative_var = c("reads", "classes")) %>% 
-  mutate(data = map(relative_var, function(relative_var){
-    tibble(thresh = seq(0,1, by = 0.01)) %>% 
-      mutate(data = map(thresh, function(x) DRB_relative_filter(threshold = x, relative_var = relative_var))) %>% 
-      unnest(data) %>% 
-      pivot_wider(names_from = "thresh", values_from = "locus", names_prefix = "threshold_") %>% 
-      right_join(drb_genes_df, by = "sample") %>% 
-      mutate_at(vars(contains(c("threshold", "arcas"))), function(x) x == .$invitro) %>% 
-      ungroup() %>% 
-      summarise_if(is.logical, function(x) sum(x, na.rm = T)/length(x))
-  })) %>% 
-  unnest(data) %>% 
-  pivot_longer(!relative_var, names_to = "threshold", values_to = "accuracy", names_prefix = "threshold_") %>% 
-  # Output accuracy with no threshold
-  {.$accuracy[.$threshold=="arcasHLA"][1]->>baseline_arcas_accuracy;.} %>% 
-  filter(threshold != "arcasHLA") %>% 
-  mutate(threshold = as.numeric(threshold)) 
-DRB_threshold_accuracy
-```
-
-```{r}
-DRB_threshold_accuracy  %>% 
-  ggplot(aes(x = threshold, y = accuracy, color = relative_var))+
-  geom_path()+
-  geom_hline(yintercept = baseline_arcas_accuracy, color = "red")+
-  geom_point()+
-  coord_cartesian(ylim = c(0, 1))+
-  theme_bw() +
-  theme(axis.text.x = element_text(angle = 90)) +
-  scale_y_continuous(n.breaks = 10)+
-  scale_color_brewer(palette = "Dark2")
-```
 
 # DRB gene copy number by KNN
 
@@ -173,6 +105,7 @@ drb_test <- drb_split %>% testing()
 
 ```{r}
 # Model design and fit
+library(kknn)
 drb_model <- nearest_neighbor() %>%
   set_engine("kknn") %>%
   set_mode("classification")
@@ -235,25 +168,91 @@ ggplot_build(roc_plot)$data[[1]] %>%
 drb_outcome %>% roc_auc(truth = copy_number, .pred_0:.pred_2)
 ```
 
+# Validation on PMID
+
 ```{r}
-### CV approach
-# Create workflow
-set.seed(1)
-drb_wkfl <- workflow() %>% 
-  add_recipe(recipe(copy_number ~locus+DRB3+DRB4+DRB5, data = drb_split)) %>% 
-  add_model(drb_model)
-# Single train/test model with prediction
-drb_wkfl %>% last_fit(split = drb_split) %>% collect_metrics()
-# 10-fold CV tuning
-drb_folds <- vfold_cv(drb_train, v = 10, strata = copy_number)
-drb_rs <- drb_wkfl %>% fit_resamples(resamples = drb_folds, control = control_resamples(save_pred = T))
-drb_rs %>% collect_metrics()
-drb_rs %>%
-  collect_predictions() %>% 
-  group_by(id) %>% 
-  roc_curve(truth = copy_number, .pred_0:.pred_2) %>% 
+pmid_log_dir <- "/labs/khatrilab/solomonb/covid/pmid30518681/scRNA/arcasHLA"
+pmid_samples <- read_tsv("/labs/khatrilab/solomonb/covid/pmid30518681/scRNA/SRR_Acc_List.txt", col_names = "srr") %>% pull(srr)
+pmid_alignment_stats_df <- tibble(sample = pmid_samples) %>% 
+    mutate(data = map(sample, function(x){
+      log_path <- sprintf("%s/%s/%s_arcas_genotype.log",pmid_log_dir,x,x)
+      df <- tibble(lines = read_lines(log_path))
+      if (any(grepl("error", df$lines, ignore.case = T))){
+        NA
+      } else {
+        df %>% 
+          mutate(lines = gsub("\t", "", lines)) %>% 
+          filter(grepl("^HLA", lines)) %>% 
+          separate(lines, into = c("locus", "abundance", "reads", "classes"), sep = " +")
+      }
+    })) %>%
+    unnest(data) %>% 
+    # select(-data) %>% 
+    separate(locus, into = c(NA, "locus"), sep = "-")
+pmid_alignment_stats_df
+
+pmid_drb345_ratios <- pmid_alignment_stats_df %>% filter(grepl("^DRB[1345]", locus)) %>% 
+  select(sample, locus, reads) %>% 
+  mutate(reads = as.numeric(reads)) %>% 
+  pivot_wider(names_from = "locus", values_from = 'reads', values_fill = 0) %>% 
+  mutate_at(vars(DRB3:DRB5), funs(./DRB1)) %>% 
+  select(-DRB1) %>% 
+  pivot_longer(!sample, names_to = 'locus', values_to ='frequency')
+pmid_drb345_ratios
+
+pmid_invitro <- invitro_hla <- invitro_import(path = "pmid30518681_scisco_hla.tsv", exclude_comment_samples = T) %>% 
+  mutate(sample = gsub("STU-HD-","",sample))
+pmid_invitro
+
+pmid_drb345_copy_number <- pmid_invitro %>% 
+  separate(allele, into=c('locus','allele'), sep = '\\*') %>% 
+  filter(grepl('^DRB[345]',locus)) %>%
+  select(-allele, -genotyper) %>% 
+  pivot_wider(names_from ='locus', values_from = 'allele_id', values_fn = length, values_fill = 0) %>% 
+  pivot_longer(!sample, names_to = 'locus', values_to = 'copy_number') %>% 
+  separate(sample, into = c('sample',NA), sep = '-') 
+pmid_drb345_copy_number
+
+pmid_drb345_df <- pmid_drb345_ratios %>% 
+  pivot_wider(names_from = 'locus', values_from ='frequency', values_fill=0) %>%
+  rename(Run = sample) %>% 
+  left_join(read_csv("/labs/khatrilab/solomonb/covid/pmid30518681/pmid30518681_samples.csv") %>% select(Run, sample), by = "Run") %>% 
+  mutate(sample = gsub("[0-9]","",sample)) %>% 
+  left_join(pmid_drb345_copy_number, by = c('sample')) %>% 
+  drop_na() # Drop the few samples with molecular typing but no scRNA
+pmid_drb345_df
+
+pmid_drb_outcome <- pmid_drb345_df %>% 
+  bind_cols(
+    drb_fit %>% predict(new_data = pmid_drb345_df), 
+    drb_fit %>% predict(new_data = pmid_drb345_df, type = 'prob') 
+  )
+
+pmid_drb_outcome
+
+roc_plot <- pmid_drb_outcome %>% 
+  roc_curve(truth = factor(copy_number, levels = c("0","1","2")), .pred_0:.pred_2) %>% 
   autoplot()
+ggplot_build(roc_plot)$data[[1]] %>% 
+  mutate(n_alleles = fct_recode(PANEL, "0"="1", "1"="2", "2"="3")) %>% 
+  ggplot(aes(x=x,y=y,color=n_alleles))+
+  geom_path()+
+  geom_abline(slop=1,intercept=0, linetype="dotted")+
+  theme_bw() +
+  scale_color_brewer(palette = "Set1") +
+  labs(x = "1 - Specificity", y = "Sensitivity")
+pmid_drb_outcome %>% roc_auc(truth = factor(copy_number, levels = c("0","1","2")), .pred_0:.pred_2)
 ```
+
+
+```{bash}
+<!-- for i in $(cat /labs/khatrilab/solomonb/covid/pmid30518681/scRNA/SRR_Acc_List.txt) -->
+<!-- do -->
+<!--   mkdir /labs/khatrilab/solomonb/covid/pmid30518681/scRNA/arcasHLA/${i} -->
+<!--   cp /labs/khatrilab/solomonb/covid/pmid30518681/scRNA/arcasHLA/${i}.genotype.log /labs/khatrilab/solomonb/covid/pmid30518681/scRNA/arcasHLA/${i}/${i}_arcas_genotype.log  -->
+<!-- done -->
+```
+
 
 # Update DBR genotypes
 
@@ -329,6 +328,92 @@ drb1_plot | drb345_plot | plot_layout(widths = c(3,10))
 
 
 # Old work
+
+
+
+<!-- ### DRB gene inclusion by threshold -->
+
+<!-- ```{r} -->
+<!-- # Generate df with set of DRB genes determined for each sample from  -->
+<!-- # arcasHLA alignment vs. molecular typing -->
+<!-- drb_genes_df <- all_hla_expanded %>%  -->
+<!--   filter(grepl("BL$", sample)) %>% # Limit to one time collection, so no repeats -->
+<!--   select(sample, locus, genotyper) %>%  -->
+<!--   filter(grepl("DRB", locus), genotyper %in% c("arcasHLA", "invitro")) %>%  -->
+<!--   distinct() %>%  -->
+<!--   group_by(genotyper, sample) %>%  -->
+<!--   arrange(locus, .by_group = T) %>%  -->
+<!--   summarise(locus = paste(locus, collapse = "-")) %>%  -->
+<!--   pivot_wider(names_from = "genotyper", values_from = "locus", values_fill = NA) %>%  -->
+<!--   drop_na() -->
+<!-- drb_genes_df -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- # Generates set of DRB genes with number of mapped reads reaching a  -->
+<!-- # specified threshold. Depends on alignment_stats_df -->
+<!-- DRB_relative_filter <- function(relative_var="reads", threshold=0.05){ -->
+<!--   alignment_stats_df %>%  -->
+<!--   filter(grepl("DRB[1345]", locus)) %>%  -->
+<!--   mutate_at(c('reads', 'classes'), as.numeric) %>%  -->
+<!--   group_by(sample) %>%  -->
+<!--   mutate(freq = round(!!sym(relative_var)/sum(!!sym(relative_var)), digits = 2)) %>%  -->
+<!--   select(sample, locus, freq) %>%  -->
+<!--   filter(freq >= threshold) %>%  -->
+<!--   arrange(locus, .by_group = T) %>%  -->
+<!--   summarise(locus = paste(locus, collapse = "-"))  -->
+<!-- } -->
+<!-- DRB_relative_filter() -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- DRB_threshold_accuracy <- tibble(relative_var = c("reads", "classes")) %>%  -->
+<!--   mutate(data = map(relative_var, function(relative_var){ -->
+<!--     tibble(thresh = seq(0,1, by = 0.01)) %>%  -->
+<!--       mutate(data = map(thresh, function(x) DRB_relative_filter(threshold = x, relative_var = relative_var))) %>%  -->
+<!--       unnest(data) %>%  -->
+<!--       pivot_wider(names_from = "thresh", values_from = "locus", names_prefix = "threshold_") %>%  -->
+<!--       right_join(drb_genes_df, by = "sample") %>%  -->
+<!--       mutate_at(vars(contains(c("threshold", "arcas"))), function(x) x == .$invitro) %>%  -->
+<!--       ungroup() %>%  -->
+<!--       summarise_if(is.logical, function(x) sum(x, na.rm = T)/length(x)) -->
+<!--   })) %>%  -->
+<!--   unnest(data) %>%  -->
+<!--   pivot_longer(!relative_var, names_to = "threshold", values_to = "accuracy", names_prefix = "threshold_") %>%  -->
+<!--   # Output accuracy with no threshold -->
+<!--   {.$accuracy[.$threshold=="arcasHLA"][1]->>baseline_arcas_accuracy;.} %>%  -->
+<!--   filter(threshold != "arcasHLA") %>%  -->
+<!--   mutate(threshold = as.numeric(threshold))  -->
+<!-- DRB_threshold_accuracy -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- DRB_threshold_accuracy  %>%  -->
+<!--   ggplot(aes(x = threshold, y = accuracy, color = relative_var))+ -->
+<!--   geom_path()+ -->
+<!--   geom_hline(yintercept = baseline_arcas_accuracy, color = "red")+ -->
+<!--   geom_point()+ -->
+<!--   coord_cartesian(ylim = c(0, 1))+ -->
+<!--   theme_bw() + -->
+<!--   theme(axis.text.x = element_text(angle = 90)) + -->
+<!--   scale_y_continuous(n.breaks = 10)+ -->
+<!--   scale_color_brewer(palette = "Dark2") -->
+<!-- ``` -->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 <!-- ```{r} -->
 <!-- DRB_gene_predictions <- DRB_relative_filter(relative_var="reads", threshold=0.05) -->
