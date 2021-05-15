@@ -1,0 +1,28 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+hla_fasta <- ape::read.dna("/labs/khatrilab/solomonb/references/IMGTHLA/hla_gen.fasta", format = "fasta")
+```
+
+```{r}
+hla_A_fasta <- hla_fasta[grepl(" A\\*1",names(hla_fasta))]
+# hla_A_fasta <- hla_fasta[1:20]
+hla_A_fasta
+```
+
+```{r}
+hla_aln <- ape::muscle(hla_A_fasta, exec = "/labs/khatrilab/solomonb/miniconda3/envs/muscle/bin/muscle", 
+                       file = "/labs/khatrilab/solomonb/hla_project/alignment.txt")
+```
+
+To generate an entropy plot, can upload alignment output file to: https://www.hiv.lanl.gov/cgi-bin/ENTROPY/entropy.cgi 
+
+
+```{r}
+ggmsa::ggmsa(hla_aln)
+```
+
+https://markravinet.github.io/Chapter7.html
