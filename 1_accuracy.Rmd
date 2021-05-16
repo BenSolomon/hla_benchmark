@@ -10,6 +10,7 @@ library(ggh4x)
 library(patchwork)
 source("data_import_functions.R")
 source("ggplot_layouts.R")
+source("figure_format_functions.R")
 source("accuracy_functions.R")
 isb_path <- "/labs/khatrilab/solomonb/covid/isb"
 isb_samples <- read_tsv("/labs/khatrilab/solomonb/covid/isb/logs/210217_232725/parallel.log") %>% 
@@ -34,7 +35,7 @@ prediction_frequency <- all_hla %>%
   # filter(invitro != 0) %>% 
   ### NEED TO DEAL WITH HLAMINER AMBIGOUS ALLELES
   # mutate_at(vars(arcasHLA:hlaminer), funs(./invitro)) %>% 
-  mutate_at(vars(arcasHLA:hlaminer), funs(./2)) %>% 
+  mutate_at(vars(arcasHLA:hlaminer), ~./2) %>% 
   select(-invitro) %>% 
   ungroup() %>% 
   pivot_longer(cols = arcasHLA:hlaminer, names_to = "genotyper", values_to = "frequency")
@@ -138,93 +139,19 @@ c2_f
 
 ### Success
 
-```{r, fig.width = 4, fig.height = 6}
-c1_s <- success_df%>% 
-  filter(grepl("BL$", sample)) %>% 
-  filter(grepl("^[ABC]", locus)) %>% 
-  mutate(genotyper = fct_relevel(genotyper, "arcasHLA", "phlat", "optitype", "hlaminer")) %>% 
-  gg_accuracy() +
-  ylab("Success")
-c1_s
+```{r, fig.width = 5, fig.height = 4}
+success_plt <- calculate_summary_df(success_df) %>% 
+  gg_summary_hla_accuracy(color_label = "Success")
+success_plt
 ```
 
-
-```{r, fig.width = 8, fig.height = 6}
-dp_s <- success_df %>% 
-  filter(grepl("BL$", sample)) %>% 
-  filter(grepl("^DP", locus) & genotyper %in% c("arcasHLA", "hlaminer"),) %>% 
-  gg_accuracy()
-
-dq_s <- success_df %>% 
-  filter(grepl("BL$", sample)) %>% 
-  filter(grepl("^DQ", locus) & genotyper %in% c("arcasHLA", "hlaminer", "phlat"),) %>% 
-  gg_accuracy()
-
-# dra_a <- success_df %>% 
-#   filter(grepl("^DRA", locus) & genotyper %in% c("arcasHLA", "hlaminer"),) %>% 
-#   gg_accuracy()
-
-drb1_s <- success_df %>% 
-  filter(grepl("BL$", sample)) %>% 
-  filter(grepl("^DRB1", locus) & genotyper %in% c("arcasHLA", "hlaminer", "phlat"),) %>% 
-  gg_accuracy()
-
-drb345_s <- success_df %>% 
-  filter(grepl("BL$", sample)) %>% 
-  filter(grepl("^DRB[345]", locus) & genotyper %in% c("arcasHLA", "hlaminer"),) %>% 
-  gg_accuracy()
-
-c2_s <- dp_s+ylab("Success")|
-  strip_y(dq_s)|
-  # strip_y(dra_s)|
-  strip_y(drb1_s)|
-  strip_y(drb345_s)|
-  plot_layout(widths = c(6,6,3,9))
-c2_s
-```
 
 ### Accuracy
 
-```{r, fig.width = 4, fig.height = 6}
-c1_a <- accuracy_df%>% 
-  filter(grepl("BL$", sample)) %>% 
-  filter(grepl("^[ABC]", locus)) %>% 
-  gg_accuracy()
-c1_a
-```
-
-```{r, fig.width = 8, fig.height = 6}
-dp_a <- accuracy_df %>% 
-  filter(grepl("BL$", sample)) %>% 
-  filter(grepl("^DP", locus) & genotyper %in% c("arcasHLA", "hlaminer"),) %>% 
-  gg_accuracy()
-
-dq_a <- accuracy_df %>% 
-  filter(grepl("BL$", sample)) %>% 
-  filter(grepl("^DQ", locus) & genotyper %in% c("arcasHLA", "hlaminer", "phlat"),) %>% 
-  gg_accuracy()
-
-# dra_a <- accuracy_df %>% 
-#   filter(grepl("^DRA", locus) & genotyper %in% c("arcasHLA", "hlaminer"),) %>% 
-#   gg_accuracy()
-
-drb1_a <- accuracy_df %>% 
-  filter(grepl("BL$", sample)) %>% 
-  filter(grepl("^DRB1", locus) & genotyper %in% c("arcasHLA", "hlaminer", "phlat"),) %>% 
-  gg_accuracy()
-
-drb345_a <- accuracy_df %>% 
-  filter(grepl("BL$", sample)) %>% 
-  filter(grepl("^DRB[345]", locus) & genotyper %in% c("arcasHLA", "hlaminer"),) %>% 
-  gg_accuracy()
-
-c2_a <- dp_a|
-  strip_y(dq_a)|
-  # strip_y(dra_a)|
-  strip_y(drb1_a)|
-  strip_y(drb345_a)|
-  plot_layout(widths = c(6,6,3,9))
-c2_a
+```{r, fig.width = 5, fig.height = 4}
+accuracy_plt <- calculate_summary_df(accuracy_df) %>% 
+  gg_summary_hla_accuracy(color_label = "Accuracy")
+accuracy_plt
 ```
 
 # Full figure
@@ -234,4 +161,12 @@ c2_a
   (c1_s | c2_s | plot_layout(widths = c(3,11))) /
   (c1_a | c2_a | plot_layout(widths = c(3,11)))
 ```
+
+# Accuracy by allele
+
+```{r, fig.width = 12, fig.height = 24}
+gg_allele_hla_accuracy(accuracy_df)
+```
+
+# Accuracy by individual
 
