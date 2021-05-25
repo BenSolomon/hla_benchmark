@@ -7,7 +7,7 @@ output: html_notebook
 ```{r, message=F}
 library(tidyverse)
 library(ggh4x)
-library(patchwork)
+library(cowplot)
 source("data_import_functions.R")
 source("ggplot_layouts.R")
 source("figure_format_functions.R")
@@ -93,50 +93,10 @@ accuracy_df <- compare_hla(hla_df = all_hla,
 
 ### Frequency
 
-```{r, fig.width = 4, fig.height = 6}
-c1_f <- prediction_frequency  %>% 
-  filter(grepl("BL$", sample)) %>% 
-  filter(grepl("^[ABC]", locus)) %>% 
-  gg_frequency()
-c1_f
+```{r, fig.width = 5, fig.height = 8}
+predictions_plt <- gg_hla_prediction_frequency(prediction_frequency)
+predictions_plt
 ```
-
-```{r, fig.width = 8, fig.height = 6}
-dp <- prediction_frequency %>% 
-    filter(grepl("BL$", sample)) %>% 
-  filter(grepl("^DP", locus) & genotyper %in% c("arcasHLA", "hlaminer"),) %>% 
-  gg_frequency()
-
-dq <- prediction_frequency %>% 
-  filter(grepl("BL$", sample)) %>% 
-  filter(grepl("^DQ", locus) & genotyper %in% c("arcasHLA", "hlaminer", "phlat"),) %>% 
-  gg_frequency()
-
-dra <- prediction_frequency %>% 
-  filter(grepl("BL$", sample)) %>% 
-  filter(grepl("^DRA", locus) & genotyper %in% c("arcasHLA", "hlaminer"),) %>% 
-  gg_frequency()
-
-drb1 <- prediction_frequency %>% 
-  filter(grepl("BL$", sample)) %>% 
-  filter(grepl("^DRB1", locus) & genotyper %in% c("arcasHLA", "hlaminer", "phlat"),) %>% 
-  gg_frequency()
-
-drb345 <- prediction_frequency %>% 
-  filter(grepl("BL$", sample)) %>% 
-  filter(grepl("^DRB[345]", locus) & genotyper %in% c("arcasHLA", "hlaminer"),) %>% 
-  gg_frequency()
-
-c2_f <- dp|
-  strip_y(dq)|
-  strip_y(dra)|
-  strip_y(drb1)|
-  strip_y(drb345)|
-  plot_layout(widths = c(6,6,3,3,9))
-
-c2_f
-```
-
 ### Success
 
 ```{r, fig.width = 5, fig.height = 4}
@@ -156,15 +116,40 @@ accuracy_plt
 
 # Full figure
 
-```{r, fig.width = 12, fig.height = 12}
-(c1_f | c2_f | plot_layout(widths = c(3,11))) /
-  (c1_s | c2_s | plot_layout(widths = c(3,11))) /
-  (c1_a | c2_a | plot_layout(widths = c(3,11)))
+```{r,fig.height = 6, fig.width = 8}
+plt_heatmaps <- plot_grid(
+  success_plt,
+  accuracy_plt,
+  ncol = 1,
+  labels = c("B","C")
+)
+plot_grid(
+  predictions_plt,
+  plt_heatmaps,
+  labels = c("A",NA)
+)
 ```
+
+# Accuracy table
+
+```{r, fig.width = 12}
+calculate_summary_df(accuracy_df) %>% 
+  flex_summary_hla_accuracy() %>% 
+  fontsize(size = 8, part = "all") %>% 
+  print(preview = "pptx")
+```
+
+```{r}
+calculate_summary_df(success_df) %>% 
+  flex_summary_hla_accuracy() %>% 
+  fontsize(size = 8, part = "all") %>% 
+  print(preview = "pptx")
+```
+
 
 # Accuracy by allele
 
-```{r, fig.width = 12, fig.height = 24}
+```{r, fig.width = 16, fig.height = 8}
 gg_allele_hla_accuracy(accuracy_df)
 ```
 

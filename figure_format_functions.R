@@ -53,10 +53,11 @@ reformat_hla_genotyper <- function(genotyper_vector){
       ))
 }
 
-gg_hla_prediction_frequency <- function(df, loci = NULL, color = "viridis"){
+gg_hla_prediction_frequency <- function(df, loci = NULL, color = "viridis", reverse = F){
   if (is.null(loci)){
     loci <- c("A","B","C","DPA1","DPB1","DQA1","DQB1","DRB1","DRB3","DRB4","DRB5")
   }
+  viridis_direction <- ifelse(reverse == T, -1, 1)
   df %>% 
     mutate(field = reformat_hla_field(field)) %>% 
     mutate(genotyper = reformat_hla_genotyper(genotyper)) %>% 
@@ -67,7 +68,7 @@ gg_hla_prediction_frequency <- function(df, loci = NULL, color = "viridis"){
     geom_bar(aes(fill = factor(count)), position = "fill", color = "black", size = 0.25) +
     facet_grid(locus ~ field)+
     theme_bw()+
-    scale_fill_viridis_d(option = color)+
+    scale_fill_viridis_d(option = color, direction = viridis_direction)+
     scale_y_continuous(breaks = c(0,0.5,1.0))+
     labs(x="",y="Proportion of samples",fill="Number of \npredicted \nalleles") +
     theme(axis.text.x = element_text(angle = 45, hjust = 1),
@@ -77,7 +78,8 @@ gg_hla_prediction_frequency <- function(df, loci = NULL, color = "viridis"){
 ### Expects format from figure_format_functions::calculate_summary_df
 ### Creates heatmap of mean accuracy
 ### Colors refer to those within the viridis package
-gg_summary_hla_accuracy <- function(df, color_label = "Accuracy", color = "plasma"){
+gg_summary_hla_accuracy <- function(df, color_label = "Accuracy", color = "plasma", reverse = F){
+  viridis_direction <- ifelse(reverse == T, -1, 1)
   df %>% 
     mutate(field = reformat_hla_field(field)) %>% 
     mutate(genotyper = reformat_hla_genotyper(genotyper)) %>% 
@@ -96,7 +98,10 @@ gg_summary_hla_accuracy <- function(df, color_label = "Accuracy", color = "plasm
           strip.background.x = element_blank(),
           strip.background.y = element_blank(),
           strip.text.y = element_blank()) +
-    scale_fill_viridis_c(option = color, limits = c(0,1), na.value = "transparent") +
+    scale_fill_viridis_c(option = color, 
+                         limits = c(0,1), 
+                         na.value = "transparent", 
+                         direction = viridis_direction) +
     labs(x = "", y = "", fill = color_label)
 }
 
@@ -108,7 +113,7 @@ flex_summary_hla_accuracy <- function(df){
     mutate(genotyper = reformat_hla_genotyper(genotyper)) %>% 
     mutate(cell_value = sprintf("%s %s %s", round(mean_accuracy,2),"\u00B1",round(se,2) )) %>%
     mutate(cell_value = ifelse(grepl("NA", cell_value), NA, cell_value)) %>% 
-    select(-sd,-se,-class, -mean_accuracy) %>% 
+    select(-sd,-se, -mean_accuracy) %>% 
     pivot_wider(names_from = c("field","genotyper"), values_from = "cell_value", names_sep = "-") 
   df_key <- suppressWarnings({tibble(col_keys = names(df)) %>% 
     separate(col_keys, into = c("field", "genotyper"), sep = "-", remove = F) %>%
@@ -135,9 +140,11 @@ gg_allele_hla_accuracy <- function(df, color_label = "Accuracy", field_selection
       mutate(match = map2_dbl(reference, allele, function(x,y) sum(x %in% y, na.rm = T))) %>% 
       group_by(locus, reference, genotyper) %>% 
       summarise(accuracy = mean(match), n = n()) %>%
-      ggplot(aes(x=reference, y = genotyper))+
+      # ggplot(aes(x=reference, y = genotyper))+
+      ggplot(aes(x=genotyper, y = reference))+
       geom_point(aes(fill = accuracy, size = n), shape = 21, color = "black")+
-      facet_wrap(~ locus, ncol = 1, scales = "free_x",  strip.position="right")+
+      # facet_wrap(~ locus, ncol = 1, scales = "free_x",  strip.position="right")+
+      facet_wrap(~ locus, nrow = 1, scales = "free_y",)+
       scale_fill_viridis_c(option = color) +
       scale_size_continuous(breaks = c(5,25,50,100), range = c(1,10)) +
       theme_bw()+
