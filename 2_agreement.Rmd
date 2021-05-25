@@ -10,28 +10,38 @@ library(ggh4x)
 library(patchwork)
 source("accuracy_functions.R")
 source("ggplot_layouts.R.R")
-all_hla_expanded <- readRDS("all_hla_expanded.RDS")
+```
+
+```{r}
+all_hla <- format_hla_table(combine_HLA_import(path = isb_path, samples = isb_samples, expand_invitro = T))
 ```
 
 # Time-specific accuracy
 ```{r, message==F, warning=F}
-accuracy_df <- compare_hla(hla_df = all_hla_expanded, 
-                 reference = "invitro", 
-                 exclude_missing = F, 
-                 compare_function = "accuracy") %>% 
-  select(sample, locus, field, genotyper, accuracy) %>% 
-  separate(sample, into = c('sample','time'), sep = '-') 
+accuracy_df <- compare_hla(hla_df = all_hla, 
+            reference = "invitro", 
+            exclude_missing = F, 
+            compare_function = "accuracy") 
 ```
 
-```{r, fig.width = 12, fig.height = 4}
-accuracy_df %>% filter(grepl("^[ABC]", locus) & time == "BL") %>% gg_accuracy()
-accuracy_df %>% filter(grepl("^[ABC]", locus) & time == "AC") %>% gg_accuracy()
+```{r, fig.width = 12, fig.height=4}
+BL_accuracy_plt <- calculate_summary_df(accuracy_df %>% filter(grepl("BL$", sample))) %>% 
+  {.->>BL_accuracy;.} %>% 
+  gg_summary_hla_accuracy(color_label = "Accuracy")
+AC_accuracy_plt <- calculate_summary_df(accuracy_df %>% filter(grepl("AC$", sample))) %>% 
+  {.->>AC_accuracy;.} %>% 
+  gg_summary_hla_accuracy(color_label = "Accuracy")
+comp_accuracy_plt <- BL_accuracy %>% 
+  select(locus:mean_accuracy) %>% 
+  left_join(AC_accuracy %>% select(locus:mean_accuracy),
+            by = c("locus", "field","genotyper")) %>% 
+  mutate(mean_accuracy = abs(mean_accuracy.x - mean_accuracy.y)) %>% 
+  select(locus:genotyper, mean_accuracy) %>% 
+  gg_summary_hla_accuracy(color_label = "Accuracy\nDifference")
+plot_grid(BL_accuracy_plt, AC_accuracy_plt, comp_accuracy_plt, labels = c("T1", "T2", "D"), nrow = 1)
 ```
 
-```{r, fig.width = 18, fig.height = 4}
-accuracy_df %>% filter(grepl("^D", locus) & time == "BL") %>% gg_accuracy()
-accuracy_df %>% filter(grepl("^D", locus) & time == "AC") %>% gg_accuracy()
-```
+
 # Sample agreement
 
 ```{r allele_agreement}
@@ -87,6 +97,11 @@ agreement_hla <- function(df, collections, complete_match=T){
 ```
 
 ### *In silico* agreement with each other
+
+```{r, fig.width = 18, fig.height=4}
+agreement_hla(all_hla_expanded, collections = c("AC", "BL"), complete_match = F) %>% gg_accuracy()
+# agreement_hla(all_hla_expanded, collections = c("AC", "BL"), complete_match = F) %>% gg_accuracy()
+```
 
 ```{r, fig.width = 18, fig.height=4}
 agreement_hla(all_hla_expanded, collections = c("AC", "BL"), complete_match = F) %>% gg_accuracy()
