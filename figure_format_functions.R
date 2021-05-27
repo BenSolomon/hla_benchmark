@@ -7,9 +7,9 @@ library(flextable)
 calculate_summary_df <- function(df){
   suppressMessages({df %>% 
       group_by(locus, field, genotyper) %>% 
-      summarise(mean_accuracy = mean(accuracy),
-                sd = sd(accuracy),
-                se = sd(accuracy)/sqrt(n())) %>% 
+      summarise(mean_accuracy = mean(accuracy, na.rm = T),
+                sd = sd(accuracy, na.rm=T),
+                se = sd(accuracy, na.rm=T)/sqrt(n())) %>% 
       ungroup() %>% 
       mutate(mean_accuracy = ifelse(mean_accuracy == 0, NA, mean_accuracy), 
              sd = ifelse(mean_accuracy == 0, NA, sd),
