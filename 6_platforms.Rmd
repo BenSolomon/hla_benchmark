@@ -6,14 +6,14 @@ output: html_notebook
 # TO DO
 ### ADD ALL SCRNA SAMPLES
   - Currently includes only those found in both scRNA and bulk RNA
-
-  
-### CORRECT combine_HLA_import for invitro arguments
+### CORRECT combine_HLA_import for invitro arguments?
 ### UPDATE DRB4 PREDICTIONS - complete?
+
+# DONE  
+### Extend sample C in vitro typing to Ck, C1, and C2 predicted typing
 ### Need to correctly run HLAminer for paired end reads in bulk
   - Successfully fixed HPRA
   - Problems with implementing HPTASR (perl modules). However, this can't be used for SE reads, so not fully relevant to the paper and others have benchmarked HPRA vs. HPTASR for bulk RNA elsewhere 
-### Extend sample C in vitro typing to Ck, C1, and C2 predicted typing
 
 # Reference info
 
@@ -97,8 +97,8 @@ prediction_frequency <- pmid_hla %>%
 ```
 
 ```{r, fig.width = 5, fig.height = 8}
-predictions_plt <- gg_hla_prediction_frequency(prediction_frequency)
-predictions_plt
+predictions_scRNA_plt <- gg_hla_prediction_frequency(prediction_frequency)
+predictions_scRNA_plt
 ```
 
 ### Success
@@ -110,9 +110,9 @@ success_df <- compare_hla(hla_df = pmid_hla %>% filter(sample %in% pmid_arcas),
 ```
 
 ```{r, fig.width = 5, fig.height = 4}
-success_plt <- calculate_summary_df(success_df) %>% 
+success_scRNA_plt <- calculate_summary_df(success_df) %>% 
   gg_summary_hla_accuracy(color_label = "Success")
-success_plt
+success_scRNA_plt
 ```
 
 ### Accuracy
@@ -128,9 +128,9 @@ accuracy_df <- compare_hla(hla_df = pmid_hla %>% filter(sample %in% pmid_arcas),
 ```
 
 ```{r, fig.width = 5, fig.height = 4}
-accuracy_plt <- calculate_summary_df(accuracy_df) %>% 
+accuracy_scRNA_plt <- calculate_summary_df(accuracy_df) %>% 
   gg_summary_hla_accuracy(color_label = "Accuracy")
-accuracy_plt
+accuracy_scRNA_plt
 ```
 
 # Bulk
@@ -167,6 +167,26 @@ bulk_samples <- pmid_bulk_hla %>%
   pull(sample)
 ```
 
+### Prediction frequency
+```{r}
+prediction_frequency <- pmid_bulk_hla %>% 
+  filter(sample %in% bulk_samples) %>% 
+  select(-allele_id) %>% 
+  pivot_longer(cols = field_1:field_3, names_to = "field", values_to = "allele") %>% 
+  pivot_wider(names_from = "genotyper", values_from = "allele", values_fn = function(x) sum(!is.na(x)), values_fill = 0) %>% 
+  # filter(invitro != 0) %>% 
+  ### NEED TO DEAL WITH HLAMINER AMBIGOUS ALLELES
+  # mutate_at(vars(arcasHLA:hlaminer), funs(./invitro)) %>% 
+  mutate_at(vars(arcasHLA:hlaminer), funs(./2)) %>% 
+  select(-invitro) %>%
+  ungroup() %>% 
+  pivot_longer(cols = arcasHLA:hlaminer, names_to = "genotyper", values_to = "frequency")
+```
+
+```{r, fig.width = 5, fig.height = 8}
+predictions_bulkRNA_plt <- gg_hla_prediction_frequency(prediction_frequency)
+predictions_bulkRNA_plt
+```
 
 ### Success
 ```{r}
@@ -177,9 +197,9 @@ success_df <- compare_hla(hla_df = pmid_bulk_hla %>% filter(sample %in% bulk_sam
 ```
 
 ```{r, fig.width = 5, fig.height = 4}
-success_plt <- calculate_summary_df(success_df) %>% 
+success_bulkRNA_plt <- calculate_summary_df(success_df) %>% 
   gg_summary_hla_accuracy(color_label = "Success")
-success_plt
+success_bulkRNA_plt
 ```
 
 ```{r}
@@ -190,40 +210,103 @@ accuracy_df <- compare_hla(hla_df = pmid_bulk_hla %>% filter(sample %in% bulk_sa
 ```
 
 ```{r, fig.width = 5, fig.height = 4}
-accuracy_plt <- calculate_summary_df(accuracy_df) %>% 
+accuracy_bulkRNA_plt <- calculate_summary_df(accuracy_df) %>% 
   gg_summary_hla_accuracy(color_label = "Accuracy")
-accuracy_plt
+accuracy_bulkRNA_plt
+```
+# Combined plot
+
+```{r,fig.height = 6, fig.width = 16}
+combine_plt <- cowplot::plot_grid(
+  cowplot::plot_grid(
+    predictions_scRNA_plt,
+    cowplot::plot_grid(
+      success_scRNA_plt,
+      accuracy_scRNA_plt,
+      ncol=1
+    ),
+    nrow=1
+  ),
+  cowplot::plot_grid(
+    predictions_bulkRNA_plt,
+    cowplot::plot_grid(
+      success_bulkRNA_plt,
+      accuracy_bulkRNA_plt,
+      ncol=1
+    ),
+    nrow=1
+  ),
+  nrow=1
+)
+
+cowplot::plot_grid(
+  cowplot::plot_grid(
+    NULL,
+    NULL,
+    nrow=1,
+    labels = c("3' scRNA sequencing", "Bulk RNA sequencing")
+  ),
+  combine_plt,
+  ncol=1,
+  rel_heights = c(0.05,0.95)
+)
 ```
 
-```{r, fig.width = 8, fig.height = 4}
-c1_a <- accuracy_df%>% 
-  filter(grepl("^[ABC]", locus)) %>% 
-  gg_accuracy()
 
-dp_a <- accuracy_df %>% 
-  filter(grepl("^DP", locus) & genotyper %in% c("arcasHLA", "hlaminer"),) %>% 
-  gg_accuracy()
 
-dq_a <- accuracy_df %>% 
-  filter(grepl("^DQ", locus) & genotyper %in% c("arcasHLA", "hlaminer", "phlat"),) %>% 
-  gg_accuracy()
 
-drb1_a <- accuracy_df %>% 
-  filter(grepl("^DRB1", locus) & genotyper %in% c("arcasHLA", "hlaminer", "phlat"),) %>% 
-  gg_accuracy()
 
-drb345_a <- accuracy_df %>% 
-  filter(grepl("^DRB[345]", locus) & genotyper %in% c("arcasHLA", "hlaminer"),) %>% 
-  gg_accuracy()
 
-c2_a <- dp_a|
-  strip_y(dq_a)|
-  strip_y(drb1_a)|
-  strip_y(drb345_a)|
-  plot_layout(widths = c(6,6,3,9))
 
-c1_a | c2_a | plot_layout(widths = c(4,13))
-```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# OLD WORK
+<!-- ```{r, fig.width = 8, fig.height = 4} -->
+<!-- c1_a <- accuracy_df%>%  -->
+<!--   filter(grepl("^[ABC]", locus)) %>%  -->
+<!--   gg_accuracy() -->
+
+<!-- dp_a <- accuracy_df %>%  -->
+<!--   filter(grepl("^DP", locus) & genotyper %in% c("arcasHLA", "hlaminer"),) %>%  -->
+<!--   gg_accuracy() -->
+
+<!-- dq_a <- accuracy_df %>%  -->
+<!--   filter(grepl("^DQ", locus) & genotyper %in% c("arcasHLA", "hlaminer", "phlat"),) %>%  -->
+<!--   gg_accuracy() -->
+
+<!-- drb1_a <- accuracy_df %>%  -->
+<!--   filter(grepl("^DRB1", locus) & genotyper %in% c("arcasHLA", "hlaminer", "phlat"),) %>%  -->
+<!--   gg_accuracy() -->
+
+<!-- drb345_a <- accuracy_df %>%  -->
+<!--   filter(grepl("^DRB[345]", locus) & genotyper %in% c("arcasHLA", "hlaminer"),) %>%  -->
+<!--   gg_accuracy() -->
+
+<!-- c2_a <- dp_a| -->
+<!--   strip_y(dq_a)| -->
+<!--   strip_y(drb1_a)| -->
+<!--   strip_y(drb345_a)| -->
+<!--   plot_layout(widths = c(6,6,3,9)) -->
+
+<!-- c1_a | c2_a | plot_layout(widths = c(4,13)) -->
+<!-- ``` -->
 
 
 
