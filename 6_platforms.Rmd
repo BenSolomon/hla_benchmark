@@ -9,8 +9,21 @@ output: html_notebook
 
   
 ### CORRECT combine_HLA_import for invitro arguments
-### UPDATE DRB4 PREDICTIONS
+### UPDATE DRB4 PREDICTIONS - complete?
 ### Need to correctly run HLAminer for paired end reads in bulk
+  - Successfully fixed HPRA
+  - Problems with implementing HPTASR (perl modules). However, this can't be used for SE reads, so not fully relevant to the paper and others have benchmarked HPRA vs. HPTASR for bulk RNA elsewhere 
+### Extend sample C in vitro typing to Ck, C1, and C2 predicted typing
+
+# Reference info
+
+- Publication: https://pubmed.ncbi.nlm.nih.gov/30518681/
+- Ck and Sk represent a second time point for samples C and S, respectively
+  - *"A second bone marrow aspiration was performed for 2 donors (Ck, Sk) (biological replicates) either 2 or 5 months after their first aspiration, respectively."*
+- C1 and C2 represent the same sample split, technical replicates
+  - From: https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSM3396165
+  - *"Description 	Technical replicate of C1"*
+
 
 # Setup
 ```{r, message=F}
@@ -29,6 +42,15 @@ isb_samples <- read_tsv("/labs/khatrilab/solomonb/covid/isb/logs/210217_232725/p
 ```{r}
 invitro_hla <- invitro_import(path = "pmid30518681_scisco_hla.tsv", exclude_comment_samples = T) %>% 
   mutate(sample = gsub("STU-HD-","",sample))
+
+invitro_hla_c <- invitro_hla %>% filter(sample == "C")
+
+invitro_hla <- bind_rows(
+  invitro_hla,
+  invitro_hla_c %>% mutate(sample = "Ck"),
+  invitro_hla_c %>% mutate(sample = "C1"),
+  invitro_hla_c %>% mutate(sample = "C2")
+)
 ```
 # 3'
 ### Import
@@ -53,6 +75,7 @@ pmid_hla <- combine_HLA_import(
 pmid_hla <- format_hla_table(pmid_hla) %>% 
   select(sample,allele_id,locus,field_1,field_2,field_3,genotyper)
 pmid_hla
+pmid_hla %>% count(sample, genotyper)
 ```
 
 ### Prediction frequency
