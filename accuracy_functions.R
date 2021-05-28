@@ -127,7 +127,8 @@ compare_hla<- function(hla_df, reference = "invitro", exclude_missing=T, compare
       filter_at(vars(c(reference, allele)), function(x) !is.na(x)) %>% 
       mutate(n_reference = map_dbl(reference, function(x) sum(!is.na(x) & !grepl("NA", x)))) %>% 
       mutate(n_allele = map_dbl(allele, function(x) sum(!is.na(x) & !grepl("NA", x)))) %>% 
-      filter_at(vars(contains("n_")), function(x) x ==2)
+      # filter_at(vars(contains("n_")), function(x) x ==2) # Removed b/c excluding samples where invitro n = 1 and sample n = 2, which is unwanted
+      filter(n_allele == 2)
   }
   if (compare_function == "accuracy"){
     df <- df %>% mutate(accuracy = map2_dbl(reference, allele, allele_match))

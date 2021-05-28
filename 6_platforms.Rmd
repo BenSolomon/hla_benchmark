@@ -10,6 +10,7 @@ output: html_notebook
   
 ### CORRECT combine_HLA_import for invitro arguments
 ### UPDATE DRB4 PREDICTIONS
+### Need to correctly run HLAminer for paired end reads in bulk
 
 # Setup
 ```{r, message=F}
@@ -44,12 +45,13 @@ pmid_hla <- combine_HLA_import(
   # mutate(sra = ifelse(grepl("^SRR", original_name), original_name, NA)) %>% 
   left_join(
     read_csv("/labs/khatrilab/solomonb/covid/pmid30518681/pmid30518681_samples.csv"),
-    by = c("original_name" = "sra")
+    by = c("original_name" = "Run")
   ) %>% 
   mutate(sample = ifelse(is.na(sample), original_name, sample)) %>% 
   select(-original_name, -platform) %>% 
-  bind_rows(invitro_hla)
-pmid_hla <- format_hla_table(pmid_hla)
+  bind_rows(invitro_hla) 
+pmid_hla <- format_hla_table(pmid_hla) %>% 
+  select(sample,allele_id,locus,field_1,field_2,field_3,genotyper)
 pmid_hla
 ```
 
@@ -65,14 +67,15 @@ prediction_frequency <- pmid_hla %>%
   # filter(invitro != 0) %>% 
   ### NEED TO DEAL WITH HLAMINER AMBIGOUS ALLELES
   # mutate_at(vars(arcasHLA:hlaminer), funs(./invitro)) %>% 
-  mutate_at(vars(arcasHLA:optitype), funs(./2)) %>% 
+  mutate_at(vars(arcasHLA:hlaminer), funs(./2)) %>% 
   select(-invitro) %>%
   ungroup() %>% 
-  pivot_longer(cols = arcasHLA:optitype, names_to = "genotyper", values_to = "frequency")
+  pivot_longer(cols = arcasHLA:hlaminer, names_to = "genotyper", values_to = "frequency")
+```
 
-prediction_frequency %>% 
-  filter(grepl("^[ABC]", locus)) %>% 
-  gg_frequency()
+```{r, fig.width = 5, fig.height = 8}
+predictions_plt <- gg_hla_prediction_frequency(prediction_frequency)
+predictions_plt
 ```
 
 ### Success
@@ -81,14 +84,18 @@ success_df <- compare_hla(hla_df = pmid_hla %>% filter(sample %in% pmid_arcas),
             reference = "invitro", 
             exclude_missing = T, 
             compare_function = "accuracy") 
+```
 
-success_df%>% 
-  filter(grepl("^[ABC]", locus)) %>% 
-  gg_accuracy() +
-  ylab("Success")
+```{r, fig.width = 5, fig.height = 4}
+success_plt <- calculate_summary_df(success_df) %>% 
+  gg_summary_hla_accuracy(color_label = "Success")
+success_plt
 ```
 
 ### Accuracy
+
+
+
 
 ```{r}
 accuracy_df <- compare_hla(hla_df = pmid_hla %>% filter(sample %in% pmid_arcas), 
@@ -97,45 +104,23 @@ accuracy_df <- compare_hla(hla_df = pmid_hla %>% filter(sample %in% pmid_arcas),
             compare_function = "accuracy") 
 ```
 
-```{r, fig.width = 8, fig.height = 4}
-c1_a <- accuracy_df%>% 
-  filter(grepl("^[ABC]", locus)) %>% 
-  gg_accuracy()
-
-dp_a <- accuracy_df %>% 
-  filter(grepl("^DP", locus) & genotyper %in% c("arcasHLA", "hlaminer"),) %>% 
-  gg_accuracy()
-
-dq_a <- accuracy_df %>% 
-  filter(grepl("^DQ", locus) & genotyper %in% c("arcasHLA", "hlaminer", "phlat"),) %>% 
-  gg_accuracy()
-
-drb1_a <- accuracy_df %>% 
-  filter(grepl("^DRB1", locus) & genotyper %in% c("arcasHLA", "hlaminer", "phlat"),) %>% 
-  gg_accuracy()
-
-drb345_a <- accuracy_df %>% 
-  filter(grepl("^DRB[345]", locus) & genotyper %in% c("arcasHLA", "hlaminer"),) %>% 
-  gg_accuracy()
-
-c2_a <- dp_a|
-  strip_y(dq_a)|
-  strip_y(drb1_a)|
-  strip_y(drb345_a)|
-  plot_layout(widths = c(6,6,3,9))
-
-c1_a | c2_a | plot_layout(widths = c(4,13))
+```{r, fig.width = 5, fig.height = 4}
+accuracy_plt <- calculate_summary_df(accuracy_df) %>% 
+  gg_summary_hla_accuracy(color_label = "Accuracy")
+accuracy_plt
 ```
 
 # Bulk
 
 ### Import
 ```{r}
+
+
 # read_lines("/labs/khatrilab/solomonb/covid/pmid30518681/scRNA/SRR_Acc_List.txt")
 pmid_bulk_hla <- combine_HLA_import(
-  path = "/labs/khatrilab/solomonb/covid/pmid30518681/bulkRNA/",
+  path = "/labs/khatrilab/solomonb/covid/pmid30518681/bulkRNA",
   samples = read_lines("/labs/khatrilab/solomonb/covid/pmid30518681/bulkRNA/bulk_sra_accession.txt"),
-  # invitro_path = "pmid30518681_scisco_hla.tsv",
+  invitro_path = "pmid30518681_scisco_hla.tsv",
   filter_invitro = T
 ) %>% 
   rename(original_name = sample) %>% 
@@ -143,31 +128,48 @@ pmid_bulk_hla <- combine_HLA_import(
   # mutate(sra = ifelse(grepl("^SRR", original_name), original_name, NA)) %>% 
   left_join(
     read_csv("/labs/khatrilab/solomonb/covid/pmid30518681/pmid30518681_samples.csv"),
-    by = c("original_name" = "sra")
+    by = c("original_name" = "Run")
   ) %>% 
   mutate(sample = ifelse(is.na(sample), original_name, sample)) %>% 
   select(-original_name, -platform) %>% 
   bind_rows(invitro_hla)
-pmid_bulk_hla <- format_hla_table(pmid_bulk_hla)
+pmid_bulk_hla <- format_hla_table(pmid_bulk_hla) %>% 
+  select(sample,allele_id,locus,field_1,field_2,field_3,genotyper)
 pmid_bulk_hla
 ```
+```{r}
+bulk_samples <- pmid_bulk_hla %>% 
+  filter(genotyper != "invitro") %>% 
+  count(sample) %>% 
+  pull(sample)
+```
+
+
 ### Success
 ```{r}
-success_df <- compare_hla(hla_df = pmid_bulk_hla %>% filter(sample %in% pmid_arcas), 
+success_df <- compare_hla(hla_df = pmid_bulk_hla %>% filter(sample %in% bulk_samples), 
             reference = "invitro", 
             exclude_missing = T, 
             compare_function = "accuracy") 
-
-success_df%>% 
-  filter(grepl("^[ABC]", locus)) %>% 
-  gg_accuracy() +
-  ylab("Success")
 ```
+
+```{r, fig.width = 5, fig.height = 4}
+success_plt <- calculate_summary_df(success_df) %>% 
+  gg_summary_hla_accuracy(color_label = "Success")
+success_plt
+```
+
 ```{r}
-accuracy_df <- compare_hla(hla_df = pmid_bulk_hla %>% filter(sample %in% pmid_arcas), 
+accuracy_df <- compare_hla(hla_df = pmid_bulk_hla %>% filter(sample %in% bulk_samples), 
             reference = "invitro", 
             exclude_missing = F, 
             compare_function = "accuracy") 
+```
+
+```{r, fig.width = 5, fig.height = 4}
+accuracy_plt <- calculate_summary_df(accuracy_df) %>% 
+  gg_summary_hla_accuracy(color_label = "Accuracy")
+accuracy_plt
 ```
 
 ```{r, fig.width = 8, fig.height = 4}
