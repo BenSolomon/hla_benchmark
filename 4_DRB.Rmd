@@ -120,6 +120,22 @@ drb_fit <- drb_model %>% fit(copy_number ~locus+DRB3+DRB4+DRB5, data = drb_train
 ```
 
 ```{r}
+drb_train_outcome <- drb_train %>% 
+  bind_cols(
+    drb_fit %>% predict(new_data = drb_train), 
+    drb_fit %>% predict(new_data = drb_train, type = 'prob') 
+  )
+drb_train_outcome
+# ROC plots
+training_plt <- gg_multilevel_roc(drb_train_outcome)
+training_plt
+```
+```{r}
+# AUC calculation
+drb_train_outcome %>% roc_auc(truth = copy_number, .pred_0:.pred_2)
+```
+
+```{r}
 # Model predictions
 
 # drb_outcome <- drb_fit %>% 
@@ -138,6 +154,7 @@ drb_outcome <- drb_test %>%
   )
 
 drb_outcome
+
 ```
 
 
@@ -150,25 +167,121 @@ conf_mat(drb_outcome,
 ```
 ```{r}
 # ROC plots
-roc_plot <- drb_outcome %>% 
-  roc_curve(truth = copy_number, .pred_0:.pred_2) %>% 
-  autoplot()
-roc_plot
-ggplot_build(roc_plot)$data[[1]] %>% 
-  mutate(n_alleles = fct_recode(PANEL, "0"="1", "1"="2", "2"="3")) %>% 
-  ggplot(aes(x=x,y=y,color=n_alleles))+
-  geom_path()+
-  geom_abline(slop=1,intercept=0, linetype="dotted")+
-  theme_bw() +
-  scale_color_brewer(palette = "Set1") +
-  labs(x = "1 - Specificity", y = "Sensitivity")
+testing_plt <- gg_multilevel_roc(drb_outcome)
+testing_plt
 ```
 ```{r}
 # AUC calculation
 drb_outcome %>% roc_auc(truth = copy_number, .pred_0:.pred_2)
 ```
 
+
+# Update DBR genotypes
+
+```{r}
+# Predictions from full data
+drb_key <- drb345_df %>% bind_cols(
+  drb_fit %>% predict(new_data = drb345_df)
+) %>% 
+  select(sample, time, locus, copy_number, .pred_class) %>% 
+  unite(sample, sample, time, sep = "-")
+drb_key
+```
+
+```{r}
+# Join key, and 
+drb345_filtered <- all_hla_expanded %>% 
+  filter(genotyper == "arcasHLA" & grepl("^DRB[345]", locus)) %>% 
+  left_join(drb_key, by = c("sample", "locus")) %>% 
+  mutate(.pred_class = as.character(.pred_class)) %>% 
+  mutate_at(vars(c("copy_number", ".pred_class")), function(x) ifelse(is.na(x), "0", x)) %>% 
+  # allele_id is in order of best match per locus, so filtering to keep only
+  # those allele_ids lower or equal to the .pred_class will keep only the
+  # best alleles up to the allowable number for a given locus
+  filter(allele_id <= .pred_class) 
+drb345_filtered
+```
+
+# Filtered DRB accuracy
+
+
+```{r}
+# Create a version of all_hla_expanded for only DRB3/4/5 where there is an entry
+# for DRB3, 4, and 5 for invitro, arcasHLA, and hlaminer. If there is no prediction
+# for a resulting entry, "X" is input so that if invitro and a genotyper have an "X"
+# that would be considered a match.
+
+drb_testing <- 
+  # Create grid of all samples, allele_id, locus, and genotyper combinations
+  expand.grid(sample = all_hla_expanded %>% pull(sample) %>% unique(), 
+                           allele_id = c("1","2"),
+                           locus = c("DRB1", "DRB3", "DRB4", "DRB5"),
+                           genotyper = c("invitro", "unfiltered", "filtered")) %>% 
+  arrange(sample, locus, genotyper, allele_id) %>%
+  # Add in invitro, original arcasHLA, and filtered arcasHLA predictions by joining
+  left_join(
+    bind_rows(
+      all_hla_expanded %>% filter(genotyper == "invitro" & grepl("^DRB[1345]", locus)),
+      all_hla_expanded %>% filter(genotyper == "arcasHLA" & grepl("^DRB[1345]", locus)) %>% mutate(genotyper = "unfiltered"), 
+      drb345_filtered %>% select(-copy_number, -.pred_class) %>% mutate(genotyper = "filtered")), 
+    join_by = c("sample", "allele_id", "locus", "genotyper")) %>% 
+  # Fill in "X"s for NA resulting from the expansion, but not because of original
+  # failed genotyping predictions
+  mutate(field_1 = ifelse(is.na(field_1), "X", field_1)) %>%
+  mutate_at(vars(field_2:field_3), funs(ifelse(is.na(.) & field_1 == "X", "X", .)))
+drb_testing
+```
+
+```{r, warning = F, fig.width=8, fig.height=4}
+drb345_accuracy <- compare_hla(hla_df = drb_testing %>% filter(grepl("BL$", sample)), 
+            reference = "invitro", 
+            exclude_missing = F, 
+            compare_function = "accuracy") %>% 
+  mutate(genotyper = fct_relevel(genotyper, "unfiltered")) 
+drb1_plot <- drb345_accuracy %>% filter(locus == "DRB1" & genotyper == "unfiltered") %>% gg_accuracy()
+drb345_plot <- drb345_accuracy %>% filter(locus != "DRB1") %>% gg_accuracy()
+drb1_plot | drb345_plot | plot_layout(widths = c(3,10))
+```
+
+```{r, fig.width = 5, fig.height = 3.5}
+accuracy_plt <- calculate_summary_df(drb345_accuracy) %>% 
+  gg_summary_hla_accuracy(color_label = "Accuracy")
+accuracy_plt
+```
+
+
+```{r}
+# saveRDS(drb345_accuracy, "drb345_accuracy.RDS")
+```
+
+# Combined plot
+
+```{r, fig.width = 12, fig.height = 4}
+combined_plt <- cowplot::plot_grid(
+  training_plt,
+  testing_plt,
+  accuracy_plt,
+  nrow = 1,
+  align = "h", axis = "bt",
+  rel_widths = c(4,4,4)
+)
+cowplot::plot_grid(
+  cowplot::plot_grid(
+    NA,NA,NA,
+    labels = c("Training", "Testing", "Accuracy"),
+    nrow = 1
+  ),
+  combined_plt,
+  ncol = 1,
+  rel_heights = c(0.07, 0.95)
+)
+```
+
+
 # Validation on PMID
+
+- Ultimately, performance is lower because there are fewer DRB345 reads overall 
+- Since this reflects a different sequencing modality, it does not seem to be a fair validation
 
 ```{r}
 pmid_log_dir <- "/labs/khatrilab/solomonb/covid/pmid30518681/scRNA/arcasHLA"
@@ -252,79 +365,6 @@ pmid_drb_outcome %>% roc_auc(truth = factor(copy_number, levels = c("0","1","2")
 <!--   cp /labs/khatrilab/solomonb/covid/pmid30518681/scRNA/arcasHLA/${i}.genotype.log /labs/khatrilab/solomonb/covid/pmid30518681/scRNA/arcasHLA/${i}/${i}_arcas_genotype.log  -->
 <!-- done -->
 ```
-
-
-# Update DBR genotypes
-
-```{r}
-# Predictions from full data
-drb_key <- drb345_df %>% bind_cols(
-  drb_fit %>% predict(new_data = drb345_df)
-) %>% 
-  select(sample, time, locus, copy_number, .pred_class) %>% 
-  unite(sample, sample, time, sep = "-")
-drb_key
-```
-
-```{r}
-# Join key, and 
-drb345_filtered <- all_hla_expanded %>% 
-  filter(genotyper == "arcasHLA" & grepl("^DRB[345]", locus)) %>% 
-  left_join(drb_key, by = c("sample", "locus")) %>% 
-  mutate(.pred_class = as.character(.pred_class)) %>% 
-  mutate_at(vars(c("copy_number", ".pred_class")), function(x) ifelse(is.na(x), "0", x)) %>% 
-  # allele_id is in order of best match per locus, so filtering to keep only
-  # those allele_ids lower or equal to the .pred_class will keep only the
-  # best alleles up to the allowable number for a given locus
-  filter(allele_id <= .pred_class) 
-drb345_filtered
-```
-
-# Filtered DRB accuracy
-
-
-```{r}
-# Create a version of all_hla_expanded for only DRB3/4/5 where there is an entry
-# for DRB3, 4, and 5 for invitro, arcasHLA, and hlaminer. If there is no prediction
-# for a resulting entry, "X" is input so that if invitro and a genotyper have an "X"
-# that would be considered a match.
-
-drb_testing <- 
-  # Create grid of all samples, allele_id, locus, and genotyper combinations
-  expand.grid(sample = all_hla_expanded %>% pull(sample) %>% unique(), 
-                           allele_id = c("1","2"),
-                           locus = c("DRB1", "DRB3", "DRB4", "DRB5"),
-                           genotyper = c("invitro", "unfiltered", "filtered")) %>% 
-  arrange(sample, locus, genotyper, allele_id) %>%
-  # Add in invitro, original arcasHLA, and filtered arcasHLA predictions by joining
-  left_join(
-    bind_rows(
-      all_hla_expanded %>% filter(genotyper == "invitro" & grepl("^DRB[1345]", locus)),
-      all_hla_expanded %>% filter(genotyper == "arcasHLA" & grepl("^DRB[1345]", locus)) %>% mutate(genotyper = "unfiltered"), 
-      drb345_filtered %>% select(-copy_number, -.pred_class) %>% mutate(genotyper = "filtered")), 
-    join_by = c("sample", "allele_id", "locus", "genotyper")) %>% 
-  # Fill in "X"s for NA resulting from the expansion, but not because of original
-  # failed genotyping predictions
-  mutate(field_1 = ifelse(is.na(field_1), "X", field_1)) %>%
-  mutate_at(vars(field_2:field_3), funs(ifelse(is.na(.) & field_1 == "X", "X", .)))
-drb_testing
-```
-
-```{r, warning = F, fig.width=8, fig.height=4}
-drb345_accuracy <- compare_hla(hla_df = drb_testing %>% filter(grepl("BL$", sample)), 
-            reference = "invitro", 
-            exclude_missing = F, 
-            compare_function = "accuracy") %>% 
-  mutate(genotyper = fct_relevel(genotyper, "unfiltered")) 
-drb1_plot <- drb345_accuracy %>% filter(locus == "DRB1" & genotyper == "unfiltered") %>% gg_accuracy()
-drb345_plot <- drb345_accuracy %>% filter(locus != "DRB1") %>% gg_accuracy()
-drb1_plot | drb345_plot | plot_layout(widths = c(3,10))
-```
-
-```{r}
-# saveRDS(drb345_accuracy, "drb345_accuracy.RDS")
-```
-
 
 
 # Old work

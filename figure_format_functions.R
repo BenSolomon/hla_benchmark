@@ -152,3 +152,18 @@ gg_allele_hla_accuracy <- function(df, color_label = "Accuracy", field_selection
       theme(axis.text.x = element_text(angle= 45, hjust = 1))
   })
 }
+
+
+gg_multilevel_roc <- function(df){
+  roc_plot <- df %>% 
+    roc_curve(truth = copy_number, .pred_0:.pred_2) %>% 
+    autoplot()
+  ggplot_build(roc_plot)$data[[1]] %>% 
+    mutate(n_alleles = fct_recode(PANEL, "0"="1", "1"="2", "2"="3")) %>% 
+    ggplot(aes(x=x,y=y,color=n_alleles))+
+    geom_path()+
+    geom_abline(slope=1,intercept=0, linetype="dotted")+
+    theme_bw() +
+    scale_color_brewer(palette = "Set1") +
+    labs(x = "1 - Specificity", y = "Sensitivity", color = "Number\nof alleles")
+}
