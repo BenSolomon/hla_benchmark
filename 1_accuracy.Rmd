@@ -11,7 +11,7 @@ library(cowplot)
 source("data_import_functions.R")
 source("ggplot_layouts.R")
 source("figure_format_functions.R")
-source("accuracy_functions.R")
+source("calculation_functions.R")
 isb_path <- "/labs/khatrilab/solomonb/covid/isb"
 isb_samples <- read_tsv("/labs/khatrilab/solomonb/covid/isb/logs/210217_232725/parallel.log") %>% 
   separate(Command, into = c(NA, "sample"), sep = " ") %>% 
@@ -25,21 +25,12 @@ all_hla <- format_hla_table(combine_HLA_import(path = isb_path, samples = isb_sa
 
 # Calculations
 
-### Prediction frequency
+### Prediction tally
 
 ```{r}
-prediction_frequency <- all_hla %>% 
-  select(-allele_id) %>% 
-  pivot_longer(cols = field_1:field_3, names_to = "field", values_to = "allele") %>% 
-  pivot_wider(names_from = "genotyper", values_from = "allele", values_fn = function(x) sum(!is.na(x)), values_fill = 0) %>% 
-  # filter(invitro != 0) %>% 
-  ### NEED TO DEAL WITH HLAMINER AMBIGOUS ALLELES
-  # mutate_at(vars(arcasHLA:hlaminer), funs(./invitro)) %>% 
-  mutate_at(vars(arcasHLA:hlaminer), ~./2) %>% 
-  select(-invitro) %>% 
-  ungroup() %>% 
-  pivot_longer(cols = arcasHLA:hlaminer, names_to = "genotyper", values_to = "frequency")
-
+prediction_tally <- all_hla %>% 
+  allele_tally() %>% 
+  filter(genotyper != "invitro", !grepl("DRB[345]", locus))
 ```
 
 ### Updated accuracy with expanded HLA
@@ -91,10 +82,10 @@ accuracy_df <- compare_hla(hla_df = all_hla,
 
 # Plotting
 
-### Frequency
+### Predicition tally
 
 ```{r, fig.width = 5, fig.height = 8}
-predictions_plt <- gg_hla_prediction_frequency(prediction_frequency)
+predictions_plt <- gg_hla_prediction_tally(prediction_tally)
 predictions_plt
 ```
 ### Success

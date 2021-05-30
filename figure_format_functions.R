@@ -2,22 +2,6 @@ library(tidyverse)
 library(flextable)
 
 
-### Expects format from accuracy_functions::compare_hla
-### Summarizes accuracy across locus, field, and genotyper
-calculate_summary_df <- function(df){
-  suppressMessages({df %>% 
-      group_by(locus, field, genotyper) %>% 
-      summarise(mean_accuracy = mean(accuracy, na.rm = T),
-                sd = sd(accuracy, na.rm=T),
-                se = sd(accuracy, na.rm=T)/sqrt(n())) %>% 
-      ungroup() %>% 
-      mutate(mean_accuracy = ifelse(mean_accuracy == 0, NA, mean_accuracy), 
-             sd = ifelse(mean_accuracy == 0, NA, sd),
-             se = ifelse(mean_accuracy == 0, NA, se),
-             locus = factor(locus, levels = sort(unique(locus), decreasing = T)))
-  })
-}
-
 ### Prettifies and orders HLA fields
 reformat_hla_field <- function(field_vector){
   suppressWarnings(
@@ -41,11 +25,13 @@ reformat_hla_genotyper <- function(genotyper_vector){
     genotyper_vector %>% 
       factor() %>% 
       fct_recode(
+        "Ground truth" = "invitro",
         "HLAminer" = "hlaminer",
         "OptiType" = "optitype",
         "PHLAT" = "phlat"
       ) %>% 
       fct_relevel(
+        "Ground truth",
         "arcasHLA",
         "OptiType",
         "PHLAT",
@@ -53,7 +39,11 @@ reformat_hla_genotyper <- function(genotyper_vector){
       ))
 }
 
-gg_hla_prediction_frequency <- function(df, loci = NULL, color = "viridis", reverse = F){
+
+
+### Expects format from calculation_functions::allele_tally
+### Plots relative proportion of 0,1,2 allele predictions across all samples as a bar chart
+gg_hla_prediction_tally <- function(df, loci = NULL, color = "viridis", reverse = F){
   if (is.null(loci)){
     loci <- c("A","B","C","DPA1","DPB1","DQA1","DQB1","DRB1","DRB3","DRB4","DRB5")
   }
@@ -61,21 +51,21 @@ gg_hla_prediction_frequency <- function(df, loci = NULL, color = "viridis", reve
   df %>% 
     mutate(field = reformat_hla_field(field)) %>% 
     mutate(genotyper = reformat_hla_genotyper(genotyper)) %>% 
-    filter(frequency <= 1) %>% 
+    # filter(frequency <= 1) %>%
     filter(locus %in% loci) %>% 
-    mutate(count = frequency*2) %>% 
+    mutate(count = count) %>% 
     ggplot(aes(x = genotyper))+
     geom_bar(aes(fill = factor(count)), position = "fill", color = "black", size = 0.25) +
     facet_grid(locus ~ field)+
     theme_bw()+
     scale_fill_viridis_d(option = color, direction = viridis_direction)+
     scale_y_continuous(breaks = c(0,0.5,1.0))+
-    labs(x="",y="Proportion of samples",fill="Number of \npredicted \nalleles") +
+    labs(x="",y="Proportion of samples",fill="Number \nof alleles") +
     theme(axis.text.x = element_text(angle = 45, hjust = 1),
           strip.background.x = element_blank())
 }
 
-### Expects format from figure_format_functions::calculate_summary_df
+### Expects format from calculation_functions::calculate_summary_df
 ### Creates heatmap of mean accuracy
 ### Colors refer to those within the viridis package
 gg_summary_hla_accuracy <- function(df, color_label = "Accuracy", color = "plasma", reverse = F){
@@ -105,7 +95,7 @@ gg_summary_hla_accuracy <- function(df, color_label = "Accuracy", color = "plasm
     labs(x = "", y = "", fill = color_label)
 }
 
-### Expects format from figure_format_functions::calculate_summary_df
+### Expects format from calculation_functions::calculate_summary_df
 ### Creates a table of mean accuracy and standard error
 flex_summary_hla_accuracy <- function(df){
   df <- df %>% 
@@ -128,7 +118,7 @@ flex_summary_hla_accuracy <- function(df){
     fix_border_issues()
 }
 
-### Expects format from accuracy_functions::compare_hla
+### Expects format from calculation::compare_hla
 ### Plots accuracy by genotyper and allele, with information of total times allele was seen
 ### Only displays one HLA field, set by field_selection
 gg_allele_hla_accuracy <- function(df, color_label = "Accuracy", field_selection = "field_2", color = "plasma"){
@@ -154,6 +144,8 @@ gg_allele_hla_accuracy <- function(df, color_label = "Accuracy", field_selection
 }
 
 
+
+
 gg_multilevel_roc <- function(df){
   roc_plot <- df %>% 
     roc_curve(truth = copy_number, .pred_0:.pred_2) %>% 
@@ -167,3 +159,40 @@ gg_multilevel_roc <- function(df){
     scale_color_brewer(palette = "Set1") +
     labs(x = "1 - Specificity", y = "Sensitivity", color = "Number\nof alleles")
 }
+
+
+
+
+
+
+
+
+
+
+
+### OLD WORK
+
+### Replaced by gg_hla_predicition_tally
+### Older version that plotted allele frequency rather than count
+gg_hla_prediction_frequency <- function(df, loci = NULL, color = "viridis", reverse = F){
+  if (is.null(loci)){
+    loci <- c("A","B","C","DPA1","DPB1","DQA1","DQB1","DRB1","DRB3","DRB4","DRB5")
+  }
+  viridis_direction <- ifelse(reverse == T, -1, 1)
+  df %>% 
+    mutate(field = reformat_hla_field(field)) %>% 
+    mutate(genotyper = reformat_hla_genotyper(genotyper)) %>% 
+    filter(frequency <= 1) %>% 
+    filter(locus %in% loci) %>% 
+    mutate(count = frequency*2) %>% 
+    ggplot(aes(x = genotyper))+
+    geom_bar(aes(fill = factor(count)), position = "fill", color = "black", size = 0.25) +
+    facet_grid(locus ~ field)+
+    theme_bw()+
+    scale_fill_viridis_d(option = color, direction = viridis_direction)+
+    scale_y_continuous(breaks = c(0,0.5,1.0))+
+    labs(x="",y="Proportion of samples",fill="Number \nof alleles") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1),
+          strip.background.x = element_blank())
+}
+
