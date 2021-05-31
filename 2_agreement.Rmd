@@ -18,15 +18,15 @@ isb_samples <- read_tsv("/labs/khatrilab/solomonb/covid/isb/logs/210217_232725/p
 ```
 
 ```{r}
-all_hla <- format_hla_table(combine_HLA_import(path = isb_path, samples = isb_samples, expand_invitro = T))
+all_hla <- readRDS("all_hla_drb345_filtered.RDS")
 ```
 
 # Time-specific accuracy
 ```{r, message==F, warning=F}
 accuracy_df <- compare_hla(hla_df = all_hla, 
             reference = "invitro", 
-            exclude_missing = F, 
-            compare_function = "accuracy") 
+            exclude_missing = F,
+            penalize_extra_drb345 = T) 
 ```
 
 ```{r, fig.width = 12, fig.height=4}
@@ -40,16 +40,20 @@ comp_accuracy_plt <- BL_accuracy %>%
   select(locus:mean_accuracy) %>% 
   left_join(AC_accuracy %>% select(locus:mean_accuracy),
             by = c("locus", "field","genotyper")) %>% 
-  mutate(mean_accuracy = abs(mean_accuracy.x - mean_accuracy.y)) %>% 
+  mutate(mean_accuracy = mean_accuracy.x - mean_accuracy.y) %>% 
   select(locus:genotyper, mean_accuracy) %>% 
-  gg_summary_hla_accuracy(color_label = "Accuracy\nDifference")
+  gg_summary_hla_accuracy(color_label = "Time 1 - \nTime 2") +
+  scale_fill_gradientn(colors = RColorBrewer::brewer.pal(11, "BrBG"), limits = c(-1,1), na.value = "transparent")
+comp_accuracy_plt$layers[[1]]$aes_params$colour <- "black"
 
 time_split_plt <- plot_grid(
-  plot_grid(NULL, NULL, NULL, labels = c("Time 1", "Time 2", "Difference"), nrow = 1),
-  plot_grid(BL_accuracy_plt, AC_accuracy_plt, comp_accuracy_plt, nrow = 1),
-  ncol = 1,
-  rel_heights = c(0.1,0.9)
+  BL_accuracy_plt, 
+  AC_accuracy_plt,
+  comp_accuracy_plt, 
+  nrow = 1,
+  labels = LETTERS[1:3]
 )
+time_split_plt
 ```
 
 
@@ -86,10 +90,10 @@ predicted_agreement_df <- BL_accuracy %>%
   rowwise() %>% 
   mutate(mean_accuracy = prod(across(contains("mean_accuracy")))) %>% 
   select(-contains("[xy]$"))%>% 
-  select(-ends_with(c(".x",".y")))
+  select(-ends_with(c(".x",".y"))) %>% 
+  ungroup()
 
 predicted_agreement_plt <- predicted_agreement_df %>% gg_summary_hla_accuracy(color_label = "Expected\nAgreement")
-
 
 oe_difference_df <- observed_agreement_df %>% 
   calculate_summary_df() %>% 
@@ -100,16 +104,19 @@ oe_difference_df <- observed_agreement_df %>%
   mutate(mean_accuracy = mean_accuracy.x - mean_accuracy.y)
 
 oe_difference_plt <- oe_difference_df %>%  
+  drop_na() %>% 
   gg_summary_hla_accuracy(color_label = "Observed -\nExpected") + 
-  # scale_fill_distiller(limits = c(-1,1), palette = "Spectral", na.value = "transparent")
   scale_fill_gradientn(colors = RColorBrewer::brewer.pal(11, "BrBG"), limits = c(-1,1), na.value = "transparent")
+oe_difference_plt$layers[[1]]$aes_params$colour <- "black"
 
 agreement_plt <- plot_grid(
-  plot_grid(NULL, NULL, NULL, labels = c("Observed", "Expected", "Difference"), nrow = 1),
-  plot_grid(observed_agreement_plt, predicted_agreement_plt, oe_difference_plt, nrow = 1),
-  ncol = 1,
-  rel_heights = c(0.1,0.9)
+  observed_agreement_plt,
+  predicted_agreement_plt, 
+  oe_difference_plt, 
+  nrow = 1, 
+  labels = LETTERS[4:6]
 )
+agreement_plt
 ```
 
 
@@ -120,8 +127,7 @@ agreement_plt <- plot_grid(
 plot_grid(
   time_split_plt,
   agreement_plt,
-  ncol = 1,
-  labels = c("A","B")
+  ncol = 1
 )
 ```
 
