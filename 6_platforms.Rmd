@@ -28,11 +28,11 @@ output: html_notebook
 # Setup
 ```{r, message=F}
 library(tidyverse)
-library(ggh4x)
-library(patchwork)
+library(tidymodels)
+library(cowplot)
 source("data_import_functions.R")
-source("accuracy_functions.R")
-source("ggplot_layouts.R")
+source("calculation_functions.R")
+source("figure_format_functions.R")
 isb_path <- "/labs/khatrilab/solomonb/covid/isb"
 isb_samples <- read_tsv("/labs/khatrilab/solomonb/covid/isb/logs/210217_232725/parallel.log") %>% 
   separate(Command, into = c(NA, "sample"), sep = " ") %>% 
@@ -251,6 +251,175 @@ cowplot::plot_grid(
   rel_heights = c(0.05,0.95)
 )
 ```
+
+
+
+# DRB345 copy number modeling
+
+### Calculations
+```{r}
+### UPDATED FROM data_import_functions.R to use direct arcas log raether than pipeline arcas log
+### Negates the issue of identifying the write pipeline run
+# Import HLA loci alignment stats from arcas logs
+hla_mapping_stats_import <- function(samples, log_dir){
+  tibble(sample = samples) %>% 
+    mutate(data = map(sample, function(x){
+      log_path <- sprintf("%s/%s.genotype.log",log_dir,x)
+      df <- tibble(lines = read_lines(log_path))
+      if (any(grepl("error", df$lines, ignore.case = T))){
+        NA
+      } else {
+        df %>% 
+          mutate(lines = gsub("\t", "", lines)) %>% 
+          filter(grepl("^HLA", lines)) %>% 
+          separate(lines, into = c("locus", "abundance", "reads", "classes"), sep = " +")
+      }
+    })) %>%
+    unnest(data) %>% 
+    select(!(contains("data"))) %>% 
+    separate(locus, into = c(NA, "locus"), sep = "-")
+}
+```
+
+
+
+```{r}
+arcas_log_3p_dir <- "/labs/khatrilab/solomonb/covid/pmid30518681/scRNA/log"
+arcas_log_bulk_dir <- "/labs/khatrilab/solomonb/covid/pmid30518681/bulkRNA/arcasHLA"
+
+samples_3p <- read_tsv("/labs/khatrilab/solomonb/covid/pmid30518681/scRNA/SRR_Acc_List.txt", col_names = "srr") %>% pull(srr)
+samples_bulk <- read_tsv("/labs/khatrilab/solomonb/covid/pmid30518681/bulkRNA/bulk_sra_accession.txt", col_names = "srr") %>% pull(srr)
+
+alignment_stats_3p_df <- hla_mapping_stats_import(samples_3p, arcas_log_3p_dir)
+alignment_stats_bulk_df <- hla_mapping_stats_import(samples_bulk, arcas_log_bulk_dir)
+```
+
+```{r}
+# Get DRB345/DRB1 ratios
+drb345_ratios_3p <- get_drb345_ratios(alignment_stats_3p_df)
+drb345_ratios_bulk <- get_drb345_ratios(alignment_stats_bulk_df)
+
+# Rename pmid samples from SRA to sample names
+drb345_ratios_3p <- pmid_sample_rename(drb345_ratios_3p)
+drb345_ratios_bulk <- pmid_sample_rename(drb345_ratios_bulk)
+```
+
+```{r}
+pmid_copy_number <- get_drb345_copy_number("pmid30518681_scisco_hla.tsv") %>% 
+  mutate(sample = gsub(".*HD-","",sample))
+
+# Duplicate in vitro typing for replicate samples Ck, C1, C2
+pmid_copy_number_c <- pmid_copy_number %>% filter(sample == "C")
+
+pmid_copy_number <- bind_rows(
+  pmid_copy_number,
+  pmid_copy_number_c %>% mutate(sample = "Ck"),
+  pmid_copy_number_c %>% mutate(sample = "C1"),
+  pmid_copy_number_c %>% mutate(sample = "C2")
+)
+```
+
+```{r}
+# Combine DRB345 sequencing ratios and ground truth copy numbers
+drb345_df_3p <- create_drb345_df(drb345_ratios_3p, pmid_copy_number)
+drb345_df_bulk <- create_drb345_df(drb345_ratios_bulk, pmid_copy_number)
+```
+
+
+
+```{r}
+# Apply KNN model
+drb_fit <- readRDS("drb345_knn_model.RDS")
+drb345_3p_outcome <- drb345_df_3p %>%
+  bind_cols(
+    drb_fit %>% predict(new_data = drb345_df_3p),
+    drb_fit %>% predict(new_data = drb345_df_3p, type = 'prob')
+  ) %>% 
+  mutate(copy_number = factor(copy_number))
+
+drb345_bulk_outcome <- drb345_df_bulk %>%
+  bind_cols(
+    drb_fit %>% predict(new_data = drb345_df_bulk),
+    drb_fit %>% predict(new_data = drb345_df_bulk, type = 'prob')
+  )%>% 
+  mutate(copy_number = factor(copy_number, levels = c("0","1", "2")))
+```
+
+### ROC plots and AUC calculations
+```{r}
+# Generate ROC plots and AUC
+drb345_ROC_3p <- gg_multilevel_roc(drb345_3p_outcome)
+drb345_ROC_3p
+drb345_3p_outcome %>% roc_auc(truth = copy_number, .pred_0:.pred_2)
+
+
+drb345_ROC_bulk <- drb345_bulk_outcome %>% 
+  # None of the bulk RNA samples have 2 alleles for a single DRB345. 
+  # ROC will fail to generate without all possible allele counts {0,1,2} in ground truth
+  # Will add in place holder {2}, which will allow ROC to proceed
+  # Will exclude class-{2} ROC plot
+  # class-{0} and class-{1} plots are not affected by the "pseudotruth" addition
+  rbind(., list("2_copy_pseudotruth",0,0,0,"DRB3","2","2",0,0,1)) %>% 
+  # Proceed normally from here
+  roc_curve(truth = copy_number, .pred_0:.pred_2) %>% 
+  autoplot() %>% 
+  (function(x) ggplot_build(x)$data[[1]]) %>% 
+  mutate(n_alleles = fct_recode(PANEL, "0"="1", "1"="2", "2"="3")) %>% 
+  filter(n_alleles != "2") %>% # Removing {2} pseudotruth here
+  ggplot(aes(x=x,y=y,color=n_alleles))+
+  geom_path()+
+  geom_abline(slope=1,intercept=0, linetype="dotted")+
+  theme_bw() +
+  scale_color_brewer(palette = "Set1") +
+  labs(x = "1 - Specificity", y = "Sensitivity", color = "Number\nof alleles")
+drb345_ROC_bulk
+drb345_bulk_outcome %>% roc_auc(truth = copy_number, .pred_0:.pred_2)
+```
+
+```{r}
+# Demonstrate that pseudotruth row doesn't affect other ROC classes
+# Reformats outcome as a binary classifier. 
+# Event_level specifies {1} outcome as the base event, so plot should match {1} plot above
+drb345_bulk_outcome %>% 
+  mutate(copy_number = factor(copy_number, levels = c("0","1"))) %>% 
+  roc_curve(truth = copy_number, .pred_1, event_level = "second") %>% 
+  autoplot()
+```
+### DRB345 ratio distribution plots
+
+```{r}
+drb345_df_5p <- read_csv("isb_drb345_df.csv")
+drb345_ratio_plt_3p <- gg_drb345_ratio(drb345_df_3p, drb345_df_5p)
+drb345_ratio_plt_bulk <- gg_drb345_ratio(drb345_df_bulk, drb345_df_5p)
+drb345_ratio_plt_3p
+drb345_ratio_plt_bulk
+```
+### Combined DRB345 modeling plot
+
+```{r, fig.width=10, fig.height=8}
+plot_grid(
+  drb345_ROC_3p,
+  drb345_ratio_plt_3p,
+  drb345_ROC_bulk,
+  drb345_ratio_plt_bulk,
+  nrow = 2,
+  ncol = 2,
+  labels = LETTERS[1:4],
+  align = "h",
+  axis = "bt"
+)
+```
+
+# Update DRB345 alleles based on copy number modeling
+
+
+
+
+
+
+
+
+
 
 
 

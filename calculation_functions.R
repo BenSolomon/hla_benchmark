@@ -179,3 +179,59 @@ allele_tally <- function(df){
     ungroup() %>% 
     pivot_longer(cols = !sample:field, names_to = "genotyper", values_to = "count")
 }
+
+
+
+
+# Replaces SRA sample names with experiment sample names for PMID samples
+# Only requires input df has a single column names "sample" with SRA IDs
+pmid_sample_rename <- function(df){
+  # Import naming key
+  pmid_key <- suppressMessages(read_csv("/labs/khatrilab/solomonb/covid/pmid30518681/pmid30518681_samples.csv") %>% 
+                                 select(sample_name = sample, run_name = Run))
+  
+  # Check if names already properly formatted
+  name_check <- any(df$sample %in% pmid_key$sample_name)
+  if (name_check){
+    message("Names already formatted")
+    return(df)
+  }
+  
+  # Format names if needed
+  df %>% 
+    left_join(pmid_key, c("sample" = "run_name")) %>% 
+    select(-sample) %>% 
+    rename("sample" = sample_name)
+}
+
+# Calculate ratio of DRB345/DRB1 reads for each sample
+# Expects output of hla_mapping_stats_import
+get_drb345_ratios <- function(df){
+  df %>% 
+    filter(grepl("^DRB[1345]", locus)) %>% 
+    select(sample, locus, reads) %>% 
+    mutate(reads = as.numeric(reads)) %>% 
+    pivot_wider(names_from = "locus", values_from = 'reads', values_fill = 0) %>% 
+    mutate_at(vars(DRB3:DRB5), funs(./DRB1)) %>% 
+    select(-DRB1) %>% 
+    pivot_longer(!sample, names_to = 'locus', values_to ='frequency')
+}
+
+# Converts invitro HLA typing into counts of predicted alleles for each DRB345 gene
+get_drb345_copy_number <- function(invitro_path){
+  invitro <- invitro_import(path = invitro_path, exclude_comment_samples = T)
+  invitro %>% 
+    separate(allele, into=c('locus','allele'), sep = '\\*') %>% 
+    filter(grepl('^DRB[345]',locus)) %>%
+    select(-allele, -genotyper) %>% 
+    pivot_wider(names_from ='locus', values_from = 'allele_id', values_fn = length, values_fill = 0) %>% 
+    pivot_longer(!sample, names_to = 'locus', values_to = 'copy_number') 
+}
+
+# Combined outputs of get_drb345_ratios and get_drb345_copy_number into single DF
+create_drb345_df <- function(ratio_df, copy_number_df){
+  ratio_df %>% 
+    pivot_wider(names_from = 'locus', values_from ='frequency', values_fill=0) %>% 
+    left_join(copy_number_df, by = c('sample')) %>% 
+    drop_na()
+}

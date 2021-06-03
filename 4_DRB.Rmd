@@ -12,7 +12,7 @@ library(cowplot)
 library(kknn)
 source("data_import_functions.R")
 source("calculation_functions.R")
-source("ggplot_layouts.R")
+source("figure_format_functions.R")
 all_hla_expanded <- readRDS("all_hla_expanded.RDS")
 isb_path <- "/labs/khatrilab/solomonb/covid/isb"
 isb_samples <- read_tsv("/labs/khatrilab/solomonb/covid/isb/logs/210217_232725/parallel.log") %>% 
@@ -91,6 +91,7 @@ drb345_df <- drb345_ratios %>%
   filter(!grepl("CV$",time)) %>% # Exclude potential CV timepoint weirdness
   drop_na() # Drop the few samples with molecular typing but no scRNA
 drb345_df
+# write_csv(drb345_df, "isb_drb345_df.csv")
 ```
 
 ```{r}
@@ -128,6 +129,8 @@ drb_fit <- drb_model %>% fit(copy_number ~locus+DRB3+DRB4+DRB5, data = drb_train
 #   set_engine("ranger")
 # drb_model <- discrim::naive_Bayes() %>% 
 #   set_engine("naivebayes")
+
+# saveRDS(drb_fit, "drb345_knn_model.RDS")
 ```
 
 ### Performance on training data

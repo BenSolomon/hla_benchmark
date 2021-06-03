@@ -161,7 +161,55 @@ gg_multilevel_roc <- function(df){
 }
 
 
-
+# Expects output of create_drb345_df
+# A baseline set can be provided that adds a grey reference layer of matching visualizations (used for PMID data)
+gg_drb345_ratio <- function(sample_drb345_df, baseline_drb345_df = NULL){
+  sample_drb345_df<- sample_drb345_df %>% 
+    pivot_longer(DRB3:DRB5, names_to='locus_2', values_to='drb345_ratio') %>% 
+    filter(locus == locus_2) %>% 
+    mutate(copy_number = factor(copy_number))
+  
+  if (!is.null(baseline_drb345_df)){
+    baseline_drb345_df <- baseline_drb345_df %>%
+      pivot_longer(DRB3:DRB5, names_to='locus_2', values_to='drb345_ratio') %>%
+      filter(locus == locus_2) %>%
+      mutate(copy_number = factor(copy_number))
+  }
+  
+  sample_drb345_layers <- list(
+    geom_density(alpha = 0.1, aes(y = ..scaled.., color = copy_number, fill = copy_number)),
+    geom_point(aes(y=0), color = "black", size = 1.5),
+    geom_point(aes(y=0, color = copy_number), size = 1)
+  )
+  
+  baseline_drb345_layers <- list(
+    geom_density(data = baseline_drb345_df, aes(y = ..scaled..), fill = NA, color = "grey50"),
+    geom_point(data = baseline_drb345_df, aes(y=1), color = "grey25", size = 0.75),
+    geom_point(data = baseline_drb345_df, aes(y=1), color = "grey75", size = 0.25)
+  )
+  
+  formatting_layers <- list(
+    theme_bw(),
+    scale_fill_brewer(palette = "Set1"),
+    scale_color_brewer(palette = "Set1"),
+    facet_grid(copy_number ~ locus, scales = "free"),
+    theme(legend.position = "none"),
+    labs(x = "DRB345 / DRB1 ratio", y = "Density")
+  )
+  
+  plt <- ggplot(data = sample_drb345_df, aes(x=drb345_ratio))
+  
+  if (!is.null(baseline_drb345_df)){
+    plt <- plt + baseline_drb345_layers
+  }
+  
+  plt <- plt +
+    sample_drb345_layers +
+    formatting_layers
+  
+  
+  print(plt)
+}
 
 
 
