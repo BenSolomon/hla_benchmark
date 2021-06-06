@@ -327,3 +327,131 @@ calculate_all_hla_accuracy <- function(df){
   
   return(df)
 }
+
+
+
+# Returns best genotyper as string based on a set heirachry 
+# arcas, opti, phlat are all length-2 allele vectors or NA
+# field and locus are strings
+composite_picker <- function(locus, arcas, opti, phlat, field){
+  # Convert input allele vector to a list, so case_when isn't vectorized
+  for (g in c("arcas", "opti", "phlat")){
+    assign(g, list(get(g)))
+  }
+  # Pick composite
+  if (locus %in% c("A","B","C")){
+    output <- case_when(
+      !is.na(opti) & field != "field_3" ~ "optitype",
+      !is.na(phlat) & field != "field_3" ~ "phlat",
+      !is.na(arcas) ~ "arcasHLA",
+      TRUE ~ NA_character_
+    )
+  } else if (locus %in% c("DQB1")){
+    output <- case_when(
+      !is.na(phlat) ~ "phlat",
+      !is.na(arcas) ~ "arcasHLA",
+      TRUE ~ NA_character_
+    )
+  } else {
+    output <- case_when(
+      !is.na(arcas) ~ "arcasHLA",
+      !is.na(phlat) ~ "phlat",
+      TRUE ~ NA_character_
+    )
+  }
+  return(output)
+}
+# composite_picker(locus = "A", arcas = c("01","01"), opti = c("02","02"), phlat = c("03","03"), field = "field_1")
+
+
+# Returns allele values  in arcas, phlat, or opti 
+# based on genotyper selection specified by selection
+# Used in combination with composite_picker
+composite_selector <- function(arcas, opti, phlat, selection){
+  output <- case_when(
+    is.na(selection) ~ list(NA),
+    selection == "arcasHLA" ~ list(arcas),
+    selection == "optitype" ~ list(opti),
+    selection == "phlat" ~ list(phlat),
+    TRUE ~ list(NA)
+  )
+  return(unlist(output))
+}
+# composite_selector(arcas = 1, opti = 2, phlat = 3, selection = "optitype") 
+
+
+# Takes an accuracy df from compare_hla or calculate_all_hla_accuracy
+# and applies composite_picker and composite_selector to create a composite genotyper
+create_composite_df <- function(df){
+  df <- df %>% 
+    pivot_wider(names_from = "genotyper", values_from = c("accuracy", "allele")) %>% 
+    # Pick genotyper with composite_picker
+    mutate(composite_source = try(pmap_chr(
+      list(
+        locus = locus, 
+        arcas = allele_arcasHLA,
+        opti = allele_optitype, 
+        phlat = allele_phlat, 
+        field = field), 
+      composite_picker))) %>% 
+    # Isolate composite accuracy values with composite_selector
+    mutate(accuracy_composite = try(pmap_dbl(
+      list(
+        arcas = accuracy_arcasHLA, 
+        opti = accuracy_optitype, 
+        phlat = accuracy_phlat, 
+        selection = composite_source), 
+      composite_selector))) %>% 
+    # Isolate composite alleles with composite_selector
+    mutate(allele_composite = try(pmap(
+      list(
+        arcas = allele_arcasHLA, 
+        opti = allele_optitype, 
+        phlat = allele_phlat, 
+        selection = composite_source), 
+      composite_selector))) 
+  # Pivot df back to original configuration
+  df <- df %>% 
+    ungroup() %>% 
+    pivot_longer(
+      contains(c("allele", "accuracy")),
+      names_to = c(".value", "genotyper"),
+      names_sep = "_"
+    )
+  return(df)
+}
+
+
+# Averages accuracy values across MHC1, MHC2, and all MHC loci 
+# Expects output of compare_hla or calculate_all_hla_accuracy
+locus_average_accuracy <- function(df){
+  # First average DRB3, DRB4, DRB5 accuracy into single DRB345 term
+  drb345_average <- df %>% 
+    select(-composite_source) %>% 
+    filter(grepl("^DRB[345]", locus)) %>% 
+    group_by(sample, field, genotyper) %>% 
+    summarise(accuracy = mean(accuracy, na.rm = T)) %>% 
+    mutate(locus = "DRB345")
+  
+  # Calculate averages across MHC1 and MHC2 independently
+  average_byClass <- df %>% 
+    filter(!grepl("^DRB[345]", locus)) %>% 
+    bind_rows(drb345_average) %>% 
+    ungroup() %>% 
+    mutate(class = ifelse(grepl("^D", locus), "MHC II", "MHC I")) 
+  
+  # Calculate averages all MHC
+  average_all <- df %>% 
+    filter(!grepl("^DRB[345]", locus)) %>% 
+    bind_rows(drb345_average) %>% 
+    ungroup() %>% 
+    mutate(class = "MHC All")
+  
+  # Combine MHC-split and combined averages into single df
+  average_combined <- bind_rows(average_byClass, average_all) %>% 
+    group_by(sample, class, field, genotyper) %>% 
+    summarise(accuracy = mean(accuracy, na.rm = T)) %>% 
+    rename("locus" = "class") 
+  
+  return(average_combined)
+}

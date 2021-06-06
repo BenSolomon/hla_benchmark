@@ -28,9 +28,11 @@ reformat_hla_genotyper <- function(genotyper_vector){
         "Ground truth" = "invitro",
         "HLAminer" = "hlaminer",
         "OptiType" = "optitype",
-        "PHLAT" = "phlat"
+        "PHLAT" = "phlat",
+        "Composite" = "composite"
       ) %>% 
       fct_relevel(
+        "Composite",
         "Ground truth",
         "arcasHLA",
         "OptiType",
@@ -39,6 +41,20 @@ reformat_hla_genotyper <- function(genotyper_vector){
       ))
 }
 
+### Prettifies and orders HLA loci
+reformat_hla_loci <- function(loci_vector){
+  suppressWarnings(
+    loci_vector %>% 
+      factor() %>% 
+      fct_recode(
+        "All MHC" = "MHC All"
+      ) %>% 
+      fct_relevel(
+        "All MHC",
+        "MHC II",
+        "MHC I"
+      ))
+}
 
 
 ### Expects format from calculation_functions::allele_tally
@@ -49,6 +65,7 @@ gg_hla_prediction_tally <- function(df, loci = NULL, color = "viridis", reverse 
   }
   viridis_direction <- ifelse(reverse == T, -1, 1)
   df %>% 
+    ungroup() %>% 
     mutate(field = reformat_hla_field(field)) %>% 
     mutate(genotyper = reformat_hla_genotyper(genotyper)) %>% 
     # filter(frequency <= 1) %>%
@@ -73,6 +90,7 @@ gg_summary_hla_accuracy <- function(df, color_label = "Accuracy", color = "plasm
   df %>% 
     mutate(field = reformat_hla_field(field)) %>% 
     mutate(genotyper = reformat_hla_genotyper(genotyper)) %>% 
+    mutate(locus = reformat_hla_loci(locus)) %>% 
     mutate(class = ifelse(grepl("^[ABC]",locus),"mhc1","mhc2")) %>% 
     ggplot(aes(x = genotyper, y = locus)) +
     geom_tile(aes(fill = mean_accuracy), color = "white")+
@@ -211,7 +229,46 @@ gg_drb345_ratio <- function(sample_drb345_df, baseline_drb345_df = NULL){
   print(plt)
 }
 
-
+# Plot violin-jitter plots of sequencing pipeline task runtimes
+# Input is df with at least columns of "sample", "component", and "process_time"
+# Can take output of parse_log_time
+gg_runtime <- function(df, include_tasks = NULL){
+  # Set default tasks
+  if (is.null(include_tasks)){
+    include_tasks <- c("HISAT-AND-SORT", "ARCAS-EXTRACT", "ARCAS-GENOTYPE", 
+                       "PHLAT", "OPTITYPE", "HLAMINER")}
+  
+  # Input checks
+  arg_col <- makeAssertCollection()
+  possible_tasks <- c(
+    "FASTQ-COMPILE", "PRE-FASTQC", "TRIM", "POST-FASTQC", "HISAT-AND-SORT",
+    "INDEX", "ARCAS-EXTRACT", "ARCAS-GENOTYPE", "PHLAT", "OPTITYPE","HLAMINER"
+  )
+  df_columns <- c("sample", "component", "process_time")
+  assertNames(include_tasks, subset.of = possible_tasks, .var.name = "possible tasks", add = arg_col)
+  assertNames(colnames(df), must.include = df_columns, .var.name = "possible tasks", add = arg_col)
+  if (arg_col$isEmpty()==F) {map(arg_col$getMessages(),print);reportAssertions(arg_col)}
+  
+  # Create plot
+  plt <- df %>%
+    select(sample, component, process_time) %>%
+    mutate(process_time = as.numeric(process_time)) %>%
+    filter(component %in% include_tasks)  %>%
+    mutate(component = factor(component, levels = c(
+      "FASTQ-COMPILE", "PRE-FASTQC", "TRIM", "POST-FASTQC", "HISAT-AND-SORT",
+      "INDEX", "ARCAS-EXTRACT", "ARCAS-GENOTYPE", "PHLAT", "OPTITYPE","HLAMINER"
+    ))) %>%
+    drop_na() %>%
+    ggplot(aes(x = component, y = process_time))+
+    geom_violin(scale = "width")+
+    geom_jitter(size = 0.1, alpha = 0.2, width = 0.25) +
+    geom_boxplot(width = 0.1, outlier.size = 0)+
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    labs(x = NULL, y = "Process time (hr)")
+  
+  return(plt)
+}
 
 
 

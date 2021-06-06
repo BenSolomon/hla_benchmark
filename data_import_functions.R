@@ -207,6 +207,22 @@ hla_mapping_stats_import <- function(samples, log_dir){
 # arcas_log_dir <- sprintf("%s/logs/210309_155222",isb_path)
 # hla_mapping_stats_import(isb_samples, arcas_log_dir)
 
+# Given path to log file, extracts times and duration of each step 
+# in sequencing pipeline as a data frame
+parse_log_time <- function(path){
+  df <- tryCatch({suppressMessages(
+    read_tsv(path, col_names = "lines") %>% 
+      filter(grepl("^### ", lines)) %>% 
+      mutate(lines = gsub("### |\\[|\\]", "", lines)) %>% 
+      separate(lines, into = c("status", "component", "time"), sep = "___") %>% 
+      mutate(time = parse_date_time(time, "mdy HMS p", tz = "America/Los_Angeles")) %>% 
+      pivot_wider(names_from = status, values_from = time) %>% 
+      mutate(process_time = difftime(COMPLETE, START, unit = "hours"))
+  )}, error = function(c) NA)
+  return(df)
+}
+# sample_path <- "/labs/khatrilab/solomonb/covid/isb/logs/210217_232725/INCOV019-AC/INCOV019-AC_pipeline.log"
+# parse_log_time(sample_path)
 
 # Basic scHLAcount count matrix import
 scHLA_import <- function(sample, result_path, label_path, barcode_path){

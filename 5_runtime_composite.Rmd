@@ -3,12 +3,19 @@ title: "5) Composite HLA scores"
 output: html_notebook
 ---
 
-```{r}
+# TO DO
+
+### ADDITIONAL COMPOSITE W/O PHLAT
+### BETTER FULL PLOT LAYOUT
+
+# Setup
+```{r, message = F}
 library(tidyverse)
+library(cowplot)
 source("data_import_functions.R")
-source("accuracy_functions.R")
+source("calculation_functions.R")
 source("ggplot_layouts.R")
-all_hla_expanded <- readRDS("all_hla_expanded.RDS")
+all_hla <- readRDS("all_hla_drb345_filtered.RDS")
 isb_path <- "/labs/khatrilab/solomonb/covid/isb"
 isb_samples <- read_tsv("/labs/khatrilab/solomonb/covid/isb/logs/210217_232725/parallel.log") %>% 
   separate(Command, into = c(NA, "sample"), sep = " ") %>% 
@@ -16,91 +23,136 @@ isb_samples <- read_tsv("/labs/khatrilab/solomonb/covid/isb/logs/210217_232725/p
 ```
 
 
+# Runtime analysis
+
 ```{r}
-composite_function <- function(locus, arcas, opti, phlat, field){
-  if (locus %in% c("A","B","C")){
-    if (!is.na(opti) & field != "field_3"){tibble(genotyper_composite = list(opti), composite_source = "optitype")}
-    else if (!is.na(phlat)){tibble(genotyper_composite = list(phlat), composite_source = "phlat")}
-    else if (!is.na(arcas)){tibble(genotyper_composite = list(arcas), composite_source = "arcasHLA")}
-    else {tibble(genotyper_composite = list(NA), composite_source = NA)}
-  }
-  else if (locus %in% c("DQB1")){
-    if (!is.na(phlat)){tibble(genotyper_composite = list(phlat), composite_source = "phlat")}
-    else if (!is.na(arcas)){tibble(genotyper_composite = list(arcas), composite_source = "arcasHLA")}
-    else {tibble(genotyper_composite = list(NA), composite_source = NA)}
-  }
-  else {
-    if (!is.na(arcas)){tibble(genotyper_composite = list(arcas), composite_source = "arcasHLA")}
-    else if (!is.na(phlat)){tibble(genotyper_composite = list(phlat), composite_source = "phlat")}
-    else {tibble(genotyper_composite = list(NA), composite_source = NA)}
-  }
-}
+main_log <- sprintf("%s/logs/210217_232725", isb_path)
+hlaminer_log <- sprintf("%s/logs/210411_102218", isb_path)
 
-composite_no_phlat <- function(locus, arcas, opti, field){
-  if (locus %in% c("A","B","C")){
-    if (!is.na(opti) & field != "field_3"){tibble(genotyper_composite_no_phlat = list(opti), composite_no_phlat_source = "optitype")}
-    else if (!is.na(arcas)){tibble(genotyper_composite_no_phlat = list(arcas), composite_no_phlat_source = "arcasHLA")}
-    else {tibble(genotyper_composite_no_phlat = list(NA), composite_no_phlat_source = NA)}
-  }
-  else if (locus %in% c("DQB1")){
-    if (!is.na(arcas)){tibble(genotyper_composite_no_phlat = list(arcas), composite_no_phlat_source = "arcasHLA")}
-    else {tibble(genotyper_composite_no_phlat = list(NA), composite_no_phlat_source = NA)}
-  }
-  else {
-    if (!is.na(arcas)){tibble(genotyper_composite_no_phlat = list(arcas), composite_no_phlat_source = "arcasHLA")}
-    else {tibble(genotyper_composite_no_phlat = list(NA), composite_no_phlat_source = NA)}
-  }
-}
+time_df <- expand_grid(sample = current_samples,
+                       base_path = c(main_log, hlaminer_log)) %>% 
+  mutate(log_path = sprintf("%s/%s/%s_pipeline.log", base_path,sample, sample)) %>% 
+  mutate(data = map(log_path, parse_log_time)) %>% 
+  unnest(data)
 
-composite_function(locus = "A", arcas = c("01","01"), opti = c("02","02"), phlat = c("03","03"), field = "field_1")
-composite_function(locus = "A", arcas = NA, opti = "02", phlat = "03", field = "field_1")
+time_df
 ```
 
-```{r, message=F, warning=F, error=F}
-reference <- "invitro"
-hla_compare_composite<- all_hla_expanded %>%
+```{r}
+runtime_plt <- time_df %>% 
+  gg_runtime() +
+  scale_y_sqrt()
+runtime_plt
+```
+
+
+
+
+
+# Composite genotyper
+
+```{r}
+accuracy_df <- readRDS("isb_accuracy_drb345_filtered.RDS")
+accuracy_df
+```
+
+```{r}
+composite_accuracy_df <- accuracy_df %>% 
   filter(grepl("BL$", sample)) %>% 
-  filter(grepl("^[ABCD]", locus)) %>% 
-  select(-allele_id) %>%
-  group_by(sample, locus, genotyper) %>%
-  summarise_all(list) %>%
-  pivot_longer(cols = !c(sample, locus, genotyper), names_to = "field", values_to = "allele") %>%
-  pivot_wider(names_from = "genotyper", names_prefix = "genotyper_", values_from = "allele", values_fill = list(NA)) %>%
-  dplyr::rename("reference" = contains(reference)) %>%
-  mutate(data = try(pmap(list(locus, genotyper_arcasHLA, genotyper_optitype, genotyper_phlat, field), composite_function))) %>% 
-  unnest(data) %>% 
-  mutate(data = try(pmap(list(locus, genotyper_arcasHLA, genotyper_optitype, field), composite_no_phlat))) %>% 
-  unnest(data) %>% 
-  select(-composite_source, -composite_no_phlat_source) %>% 
-  pivot_longer(contains("genotyper"),  names_to = "genotyper", values_to = "allele",names_prefix = "genotyper_") %>% 
-  mutate(accuracy = map2_dbl(reference, allele, allele_match)) %>% 
-  drop_na() %>% 
-  mutate(genotyper = fct_recode(genotyper, "comp_AOP" = "composite", "comp_AO" = "composite_no_phlat")) %>% 
-  mutate(genotyper = fct_relevel(factor(genotyper), "comp_AOP", "comp_AO"))
-```
-
-```{r, fig.width=12, fig.height=4}
-hla_compare_composite %>% 
-  filter(grepl("^[ABC]", locus)) %>% 
-  gg_accuracy()
+  create_composite_df()
+composite_accuracy_df
 ```
 
 
-```{r, fig.width = 12, fig.height = 4}
-# compare_haplo(hla_compare_composite, mhc2_loci = c("DPA1", "DPB1","DQA1","DQB1","DRB1", "DRB3", "DRB4", "DRB5")) %>%  
-#   gg_accuracy() +
-#   facet_nested(.~locus+genotyper, scales = "free_y") +
-#     ggtitle("Haplotype accuracy", subtitle = "Composite heuristic added, missing predictions included")
-```
-
-
+# Heatmap of composite and single genotypers
 ```{r}
-valid_DRB <- DRB_gene_predictions %>% mutate(locus = str_split(locus, "-")) %>% unnest(locus) %>% mutate(valid_DRB = T)
-x <- hla_compare_composite %>% left_join(valid_DRB, join_by = c("sample", "locus")) %>% mutate(not_DRB = !grepl("DRB", locus))
+composite_loci_accuracy_plt <- composite_accuracy_df %>% 
+  calculate_summary_df() %>% 
+  gg_summary_hla_accuracy(color_label = "Accuracy")
+composite_loci_accuracy_plt
 ```
-
-
+### Difference between composite and single genotypers
 ```{r}
-hla_compare_composite
+composite_loci_difference_plt <- composite_accuracy_df %>% 
+  calculate_summary_df() %>% 
+  select(-sd, - se) %>%
+  pivot_wider(names_from = "genotyper", values_from = "mean_accuracy") %>% 
+  pivot_longer(contains(c("arcasHLA", "hlaminer", "optitype", "phlat")), names_to = "genotyper", values_to = "genotyper_accuracy") %>% 
+  mutate(mean_accuracy = composite - genotyper_accuracy) %>% 
+  gg_summary_hla_accuracy(color_label = "Composite -\nindividual\ngenotyper\naccuracy") +
+  scale_fill_gradientn(colors = RColorBrewer::brewer.pal(11, "BrBG"), limits = c(-0.25,0.25), na.value = "transparent", oob=squish)
+composite_loci_difference_plt
 ```
 
+# Locus averaging
+
+```{r, fig.width = 7, fig.height = 3}
+averaged_composite_accuracy <- composite_accuracy_df %>% 
+  locus_average_accuracy() 
+
+composite_average_accuracy_plt <- averaged_composite_accuracy %>% 
+  calculate_summary_df() %>% 
+  gg_summary_hla_accuracy()
+composite_average_accuracy_plt
+
+composite_average_difference_plt <- averaged_composite_accuracy %>% 
+  calculate_summary_df() %>% 
+  select(-sd, - se) %>%
+  pivot_wider(names_from = "genotyper", values_from = "mean_accuracy") %>% 
+  pivot_longer(contains(c("arcasHLA", "hlaminer", "optitype", "phlat")), names_to = "genotyper", values_to = "genotyper_accuracy") %>% 
+  mutate(mean_accuracy = composite - genotyper_accuracy) %>% 
+  gg_summary_hla_accuracy(color_label = "Composite -\nindividual\ngenotyper\naccuracy") +
+  scale_fill_gradientn(colors = RColorBrewer::brewer.pal(11, "BrBG"), limits = c(-0.25,0.25), na.value = "transparent", oob=squish)
+composite_average_difference_plt
+```
+# Combined plots
+```{r, fig.width = 12, fig.height = 8}
+loci_plt <- plot_grid(
+  composite_loci_accuracy_plt,
+  composite_loci_difference_plt,
+  ncol = 1,
+  align = "v",
+  axis = "lr"
+)
+
+average_plt <- plot_grid(
+  composite_average_accuracy_plt,
+  composite_average_difference_plt,
+  ncol = 1,
+  align = "v",
+  axis = "lr"
+)
+
+plot_grid(
+  plot_grid(
+    runtime_plt,
+    average_plt,
+    ncol = 1,
+    align = "v",
+    axis = "lr"
+  ),
+  loci_plt,
+  nrow = 1,
+  align = "h",
+  axis = "tb"
+)
+```
+
+```{r, fig.width = 6, fig.height = 12}
+plot_grid(
+  runtime_plt,
+  composite_loci_accuracy_plt,
+  composite_loci_difference_plt,
+  composite_average_accuracy_plt,
+  composite_average_difference_plt,
+  ncol = 1,
+  align = "v",
+  axis = "lr",
+  rel_heights = c(1,1,1,0.6,0.6)
+)
+```
+
+
+
+
+# Null composite 
