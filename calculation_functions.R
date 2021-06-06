@@ -310,4 +310,20 @@ calculate_drb345_accuracy <- function(df, score_absent_predictions=F){
       match_drb345_na = F)
 }
 
-
+# Wrapper to combine accuracy calculation for drb345 and non-drb345 loci
+# Expects a df in the form of format_hla_table
+calculate_all_hla_accuracy <- function(df){
+  non_drb345_df <- df %>% 
+    filter(!(grepl("^DRB[345]", locus))) %>% 
+    compare_hla(
+      hla_df = ., 
+      reference = "invitro", 
+      exclude_missing = F)
+  
+  drb345_df <- all_hla_drb345_filtered %>% 
+    calculate_drb345_accuracy()
+  
+  df <- bind_rows(non_drb345_df, drb345_df)
+  
+  return(df)
+}
