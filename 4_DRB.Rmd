@@ -3,6 +3,10 @@ title: "4) Predicting HLA-DRB4 paralogs"
 output: html_notebook
 ---
 
+# TO DO
+
+### Implement KNN functions created to apply model to PMID in 6)
+
 # Startup
 
 ```{r, message = F}
@@ -54,8 +58,6 @@ pre_tally_plt
 ```{r}
 all_hla %>% count(sample, locus, genotyper)
 ```
-
-
 
 ### Pre-processing and visualization
 
@@ -211,49 +213,40 @@ drb345_filtered
 ```
 
 ```{r}
-# Create a version of all_hla_expanded for only DRB3/4/5 where there is an entry
-# for DRB3, 4, and 5 for invitro, arcasHLA, and hlaminer. If there is no prediction
-# for a resulting entry, "X" is input so that if invitro and a genotyper have an "X"
-# that would be considered a match.
+score_absent <- F
 
-drb_testing <- 
-  # Create grid of all samples, allele_id, locus, and genotyper combinations
-  expand.grid(sample = all_hla %>% pull(sample) %>% unique(), 
-                           allele_id = c("1","2"),
-                           locus = c("DRB1", "DRB3", "DRB4", "DRB5"),
-                           genotyper = c("invitro", unique(drb345_filtered$genotyper)),
-                           filtered = c(T,F)) %>% 
-  arrange(sample, locus, genotyper, allele_id) %>%
-  # Add in invitro, original and filtered genotyper predictions by joining
-  left_join(
-    bind_rows(
-      all_hla %>% filter(genotyper == "invitro" & grepl("^DRB[1345]", locus)),
-      all_hla %>% filter(grepl("^DRB[1345]", locus)) %>% mutate(filtered = F),
-      drb345_filtered %>% select(-copy_number, -.pred_class) %>% mutate(filtered = T)), 
-    join_by = c("sample", "allele_id", "locus", "genotyper", "filtered")) %>% 
-    filter(!is.na(field_1))
-drb_testing
-```
+drb345_filtered_accuracy <- bind_rows(
+  drb345_filtered %>% 
+    select(-copy_number, -.pred_class),
+  all_hla %>% 
+    filter(grepl("^DRB[345]", locus), genotyper == "invitro")
+) %>% 
+  calculate_drb345_accuracy(score_absent_predictions = score_absent) 
 
-```{r}
-drb345_accuracy <- compare_hla(
-  hla_df = drb_testing %>% 
+drb345_unfiltered_accuracy <- all_hla %>% 
+    filter(grepl("^DRB[345]", locus)) %>% 
+    calculate_drb345_accuracy(score_absent_predictions = score_absent) 
+
+drb345_accuracy_comparison <- bind_rows(
+  drb345_filtered_accuracy %>% 
     filter(grepl("BL$", sample)) %>% 
-    unite(genotyper, filtered, col = "genotyper", sep = "_"),
-  reference = "invitro_FALSE",
-  exclude_missing = F)
-drb345_accuracy
-```
+    calculate_summary_df() %>% 
+    mutate(genotyper_2 = genotyper,
+           genotyper = "Filtered"),
+  drb345_unfiltered_accuracy %>% 
+    filter(grepl("BL$", sample)) %>% 
+    calculate_summary_df() %>% 
+    mutate(genotyper_2 = genotyper,
+           genotyper = "Unfiltered"),
+)
 
+drb345_accuracy_plt <- drb345_accuracy_comparison %>% 
+  mutate(genotyper = fct_relevel(genotyper, "Unfiltered", "Filtered")) %>% 
+  gg_summary_hla_accuracy(color_label = "Accuracy") + 
+  facet_grid(genotyper_2~field) + 
+  theme(strip.text.y = element_text(angle = 270))
 
-```{r, fig.width = 5, fig.height = 3.5}
-accuracy_plt <- calculate_summary_df(drb345_accuracy) %>% 
-  # Using genotyper and genotyper_2 names to fit into gg_summary_hla_accuracy
-  separate(genotyper, into = c("genotyper_2", "genotyper"), sep = "_") %>% 
-  mutate(genotyper = fct_recode(genotyper, "Unfiltered" = "FALSE", "Filtered" = "TRUE")) %>% 
-  mutate(genotyper2 = reformat_hla_genotyper(genotyper_2)) %>% 
-  gg_summary_hla_accuracy(color_label = "Accuracy") + facet_grid(genotyper_2~field) + theme(strip.text.y = element_text(angle = 270))
-accuracy_plt
+drb345_accuracy_plt
 ```
 
 
@@ -263,7 +256,7 @@ accuracy_plt
 
 # Combined plot
 
-```{r, fig.width = 8, fig.height = 6}
+```{r, fig.width = 7, fig.height = 6}
 
 plot_grid(
   plot_grid(
@@ -272,11 +265,11 @@ plot_grid(
     align = "h",
     axis = "bt",
     labels = c("A","B"),
-    rel_widths = c(4,3)
+    rel_widths = c(4,3.5)
   ),
   plot_grid(
     post_tally_plt,
-    accuracy_plt,
+    drb345_accuracy_plt,
     nrow = 1,
     align = "h",
     axis = "bt",
@@ -285,7 +278,6 @@ plot_grid(
   ),
   ncol = 1
 )
-
 ```
 
 ### Updating all_hla with filtered DRB345 and verifying
@@ -296,118 +288,20 @@ all_hla_drb345_filtered <- all_hla %>%
     drb345_filtered %>% select(-copy_number, -.pred_class)
   )
 
-accuracy_df <- compare_hla(hla_df = all_hla_drb345_filtered, 
-            reference = "invitro", 
-            exclude_missing = F,
-            penalize_extra_drb345 = T) 
+# saveRDS(all_hla_drb345_filtered, "all_hla_drb345_filtered.RDS")
+# all_hla_drb345_filtered <- readRDS("all_hla_drb345_filtered.RDS")
+
+accuracy_df <- calculate_all_hla_accuracy(all_hla_drb345_filtered)
+
+# saveRDS(accuracy_df, "isb_accuracy_drb345_filtered.RDS")
+# accuracy_df <- readRDS("isb_accuracy_drb345_filtered.RDS")
 
 accuracy_df %>% 
-  filter(grepl("-BL$", sample)) %>% 
-  calculate_summary_df() %>% 
-  filter(grepl("DRB[345]", locus), field == "field_2", genotyper %in% c("arcasHLA", "hlaminer"))
-drb345_accuracy %>% 
-  filter(grepl("-BL$", sample)) %>% 
-  separate(genotyper, into = c("genotyper", "filtered"), sep = "_") %>% 
-  filter(filtered == "TRUE") %>% 
-  calculate_summary_df() %>% 
-  filter(grepl("DRB[345]", locus), field == "field_2", genotyper %in% c("arcasHLA", "hlaminer"))
-
-accuracy_df %>% 
-  filter(grepl("-BL$", sample)) %>% 
+  filter(grepl("BL$", sample)) %>% 
   calculate_summary_df() %>% 
   gg_summary_hla_accuracy(color_label = "Accuracy")
-
-# saveRDS(all_hla_drb345_filtered, "all_hla_drb345_filtered.RDS")
 ```
 
-
-# Validation on PMID
-
-- Ultimately, performance is lower because there are fewer DRB345 reads overall 
-- Since this reflects a different sequencing modality, it does not seem to be a fair validation
-
-<!-- ```{r} -->
-<!-- pmid_log_dir <- "/labs/khatrilab/solomonb/covid/pmid30518681/scRNA/arcasHLA" -->
-<!-- pmid_samples <- read_tsv("/labs/khatrilab/solomonb/covid/pmid30518681/scRNA/SRR_Acc_List.txt", col_names = "srr") %>% pull(srr) -->
-<!-- pmid_alignment_stats_df <- tibble(sample = pmid_samples) %>%  -->
-<!--     mutate(data = map(sample, function(x){ -->
-<!--       log_path <- sprintf("%s/%s/%s_arcas_genotype.log",pmid_log_dir,x,x) -->
-<!--       df <- tibble(lines = read_lines(log_path)) -->
-<!--       if (any(grepl("error", df$lines, ignore.case = T))){ -->
-<!--         NA -->
-<!--       } else { -->
-<!--         df %>%  -->
-<!--           mutate(lines = gsub("\t", "", lines)) %>%  -->
-<!--           filter(grepl("^HLA", lines)) %>%  -->
-<!--           separate(lines, into = c("locus", "abundance", "reads", "classes"), sep = " +") -->
-<!--       } -->
-<!--     })) %>% -->
-<!--     unnest(data) %>%  -->
-<!--     # select(-data) %>%  -->
-<!--     separate(locus, into = c(NA, "locus"), sep = "-") -->
-<!-- pmid_alignment_stats_df -->
-
-<!-- pmid_drb345_ratios <- pmid_alignment_stats_df %>% filter(grepl("^DRB[1345]", locus)) %>%  -->
-<!--   select(sample, locus, reads) %>%  -->
-<!--   mutate(reads = as.numeric(reads)) %>%  -->
-<!--   pivot_wider(names_from = "locus", values_from = 'reads', values_fill = 0) %>%  -->
-<!--   mutate_at(vars(DRB3:DRB5), funs(./DRB1)) %>%  -->
-<!--   select(-DRB1) %>%  -->
-<!--   pivot_longer(!sample, names_to = 'locus', values_to ='frequency') -->
-<!-- pmid_drb345_ratios -->
-
-<!-- pmid_invitro <- invitro_hla <- invitro_import(path = "pmid30518681_scisco_hla.tsv", exclude_comment_samples = T) %>%  -->
-<!--   mutate(sample = gsub("STU-HD-","",sample)) -->
-<!-- pmid_invitro -->
-
-<!-- pmid_drb345_copy_number <- pmid_invitro %>%  -->
-<!--   separate(allele, into=c('locus','allele'), sep = '\\*') %>%  -->
-<!--   filter(grepl('^DRB[345]',locus)) %>% -->
-<!--   select(-allele, -genotyper) %>%  -->
-<!--   pivot_wider(names_from ='locus', values_from = 'allele_id', values_fn = length, values_fill = 0) %>%  -->
-<!--   pivot_longer(!sample, names_to = 'locus', values_to = 'copy_number') %>%  -->
-<!--   separate(sample, into = c('sample',NA), sep = '-')  -->
-<!-- pmid_drb345_copy_number -->
-
-<!-- pmid_drb345_df <- pmid_drb345_ratios %>%  -->
-<!--   pivot_wider(names_from = 'locus', values_from ='frequency', values_fill=0) %>% -->
-<!--   rename(Run = sample) %>%  -->
-<!--   left_join(read_csv("/labs/khatrilab/solomonb/covid/pmid30518681/pmid30518681_samples.csv") %>% select(Run, sample), by = "Run") %>%  -->
-<!--   mutate(sample = gsub("[0-9]","",sample)) %>%  -->
-<!--   left_join(pmid_drb345_copy_number, by = c('sample')) %>%  -->
-<!--   drop_na() # Drop the few samples with molecular typing but no scRNA -->
-<!-- pmid_drb345_df -->
-
-<!-- pmid_drb_outcome <- pmid_drb345_df %>%  -->
-<!--   bind_cols( -->
-<!--     drb_fit %>% predict(new_data = pmid_drb345_df),  -->
-<!--     drb_fit %>% predict(new_data = pmid_drb345_df, type = 'prob')  -->
-<!--   ) -->
-
-<!-- pmid_drb_outcome -->
-
-<!-- roc_plot <- pmid_drb_outcome %>%  -->
-<!--   roc_curve(truth = factor(copy_number, levels = c("0","1","2")), .pred_0:.pred_2) %>%  -->
-<!--   autoplot() -->
-<!-- ggplot_build(roc_plot)$data[[1]] %>%  -->
-<!--   mutate(n_alleles = fct_recode(PANEL, "0"="1", "1"="2", "2"="3")) %>%  -->
-<!--   ggplot(aes(x=x,y=y,color=n_alleles))+ -->
-<!--   geom_path()+ -->
-<!--   geom_abline(slop=1,intercept=0, linetype="dotted")+ -->
-<!--   theme_bw() + -->
-<!--   scale_color_brewer(palette = "Set1") + -->
-<!--   labs(x = "1 - Specificity", y = "Sensitivity") -->
-<!-- pmid_drb_outcome %>% roc_auc(truth = factor(copy_number, levels = c("0","1","2")), .pred_0:.pred_2) -->
-<!-- ``` -->
-
-
-<!-- ```{bash} -->
-<!-- <!-- for i in $(cat /labs/khatrilab/solomonb/covid/pmid30518681/scRNA/SRR_Acc_List.txt) --> -->
-<!-- <!-- do --> -->
-<!-- <!--   mkdir /labs/khatrilab/solomonb/covid/pmid30518681/scRNA/arcasHLA/${i} --> -->
-<!-- <!--   cp /labs/khatrilab/solomonb/covid/pmid30518681/scRNA/arcasHLA/${i}.genotype.log /labs/khatrilab/solomonb/covid/pmid30518681/scRNA/arcasHLA/${i}/${i}_arcas_genotype.log  --> -->
-<!-- <!-- done --> -->
-<!-- ``` -->
 
 
 # Old work

@@ -3,7 +3,7 @@ library(checkmate)
 
 
 ### Allele matching function
-allele_match <- function(ref,comp,ground_truth=T, verbose=F){
+allele_match <- function(ref,comp,ground_truth=T, verbose=F, count_NA_match = F){
   display_message <-  ifelse(verbose == F, "message", "none")
   
   suppressMessages({
@@ -15,8 +15,15 @@ allele_match <- function(ref,comp,ground_truth=T, verbose=F){
     n_ref <- sum(!is.na(ref))
     n_comp <- sum(!is.na(comp))
     
-    # Return NA if all alleles are NA
-    if(n_ref==0 & n_comp==0){message("No alleles for comparison");return(NA)}
+    # How to handle NAs in both reference and comparison
+    if(n_ref==0 & n_comp==0){
+      # Default: Return NA
+      if (count_NA_match == F){message("No alleles for comparison");return(NA)}
+      # Alternative: Consider perfect match. Relevant for DRB345 where lacking a
+      # prediction when there is no reference is actually informative
+      else {return(1)}
+    }
+    
     # If ref is ground_truth, return NA if all ref alleles are NA
     if(n_ref==0 & ground_truth==T){message("No ground truth alleles");return(NA)}
     # Cannot have more than two alleles
@@ -103,7 +110,12 @@ allele_match <- function(ref,comp,ground_truth=T, verbose=F){
 # unit_test_output
 
 
-compare_hla<- function(hla_df, reference = "invitro", exclude_missing=T, penalize_extra_drb345 = T, penalize_extra_classic = F){
+compare_hla<- function(hla_df, 
+                       reference = "invitro", 
+                       exclude_missing=T, 
+                       penalize_extra_drb345 = T, 
+                       penalize_extra_classic = F,
+                       match_drb345_na = T){
   # Input checks
   arg_col <- makeAssertCollection()
   hla_df_columns <- c("sample", "allele_id", "locus", "field_1", "field_2", "field_3", "genotyper")
@@ -133,10 +145,14 @@ compare_hla<- function(hla_df, reference = "invitro", exclude_missing=T, penaliz
   }
   df_drb345 <- df %>% 
     filter(grepl("^DRB[345]",locus)) %>% 
-    mutate(accuracy = map2_dbl(reference, allele, allele_match, ground_truth = !penalize_extra_drb345))
+    mutate(accuracy = map2_dbl(reference, allele, allele_match, 
+                               ground_truth = !penalize_extra_drb345, 
+                               count_NA_match = match_drb345_na))
   df_other <- df %>% 
     filter(grepl("^[ABC]",locus) | grepl("^D[PQR][AB]1", locus)) %>% 
-    mutate(accuracy = map2_dbl(reference, allele, allele_match, ground_truth = !penalize_extra_classic))
+    mutate(accuracy = map2_dbl(reference, allele, allele_match, 
+                               ground_truth = !penalize_extra_classic, 
+                               count_NA_match = F))
   df <- bind_rows(
     df_other,
     df_drb345
@@ -157,7 +173,8 @@ calculate_summary_df <- function(df){
       group_by(locus, field, genotyper) %>% 
       summarise(mean_accuracy = mean(accuracy, na.rm = T),
                 sd = sd(accuracy, na.rm=T),
-                se = sd(accuracy, na.rm=T)/sqrt(n())) %>% 
+                se = sd(accuracy, na.rm=T)/sqrt(n()),
+                n =) %>% 
       ungroup() %>% 
       mutate(mean_accuracy = ifelse(mean_accuracy == 0, NA, mean_accuracy), 
              sd = ifelse(mean_accuracy == 0, NA, sd),
@@ -235,3 +252,62 @@ create_drb345_df <- function(ratio_df, copy_number_df){
     left_join(copy_number_df, by = c('sample')) %>% 
     drop_na()
 }
+
+# Creates an expanded df of all valid loci-field-genotyper combinations for drb345
+# Used to join data to include entries for absent predictions
+# Takes a list of samples create all combinations along
+# Valid combinations determined from isb data since many samples
+make_drb_scaffold <- function(samples){
+  isb_hla <- readRDS("all_hla_expanded.RDS")
+  valid_combinations <- isb_hla %>% 
+    filter(grepl("^DRB[345]", locus)) %>% 
+    select(locus, contains("field"), genotyper) %>% 
+    pivot_longer(contains("field"), names_to = "field", values_to = "allele") %>% 
+    drop_na() %>% 
+    select(-allele) %>% 
+    distinct() %>% 
+    unite(valid_combination, sep = "__") %>% 
+    pull(valid_combination)
+  df <- expand.grid(
+    sample = unique(samples),
+    allele_id = c("1","2"),
+    valid_combination = valid_combinations
+  ) %>% 
+    separate(valid_combination, into = c("locus", "genotyper", "field"), sep = "__")
+  return(df)
+}
+
+# Calculates drb345 accuracy based at all valid locus-field-genotyper combinations 
+# (e.g. no field_3 for HLAminer), even if not seen in data.
+# score_absent_predictions determines the absence of a prediction is itself considered
+# informative and given a pseudovalue "X" which is then scored by allele_match.
+# Expects df in the same format as from format_hla_table  
+calculate_drb345_accuracy <- function(df, score_absent_predictions=F){
+  # Input checks
+  arg_col <- makeAssertCollection()
+  df_columns <- c("sample", "allele_id", "locus", "field_1", "field_2", "field_3", "genotyper")
+  assertNames(names(df), permutation.of = df_columns, .var.name = "df column names", add = arg_col)
+  assertLogical(score_absent_predictions, add = arg_col)
+  if (arg_col$isEmpty()==F) {map(arg_col$getMessages(),print);reportAssertions(arg_col)}
+  
+  #Function
+  drb_scaffold <- make_drb_scaffold(unique(df$sample))
+  
+  df <- df %>% 
+    pivot_longer(contains("field"), names_to = "field", values_to = "allele") %>% 
+    right_join(drb_scaffold, by = names(drb_scaffold)) 
+  
+  if (score_absent_predictions==T){
+    df <- df %>% mutate(allele = ifelse(is.na(allele), "X", allele))
+  }
+  
+  df %>% 
+    pivot_wider(names_from = "field", values_from = "allele", values_fn = function(x) ifelse(length(x) > 1, NA, x)) %>% 
+    compare_hla(
+      hla_df = .,
+      reference = "invitro",
+      exclude_missing = F,
+      match_drb345_na = F)
+}
+
+
