@@ -333,7 +333,7 @@ calculate_all_hla_accuracy <- function(df){
 # Returns best genotyper as string based on a set heirachry 
 # arcas, opti, phlat are all length-2 allele vectors or NA
 # field and locus are strings
-composite_picker <- function(locus, arcas, opti, phlat, field){
+composite_picker <- function(locus, arcas, opti, phlat, field, include_phlat=T){
   # Convert input allele vector to a list, so case_when isn't vectorized
   for (g in c("arcas", "opti", "phlat")){
     assign(g, list(get(g)))
@@ -342,20 +342,20 @@ composite_picker <- function(locus, arcas, opti, phlat, field){
   if (locus %in% c("A","B","C")){
     output <- case_when(
       !is.na(opti) & field != "field_3" ~ "optitype",
-      !is.na(phlat) & field != "field_3" ~ "phlat",
+      !is.na(phlat) & field != "field_3" & include_phlat == T ~ "phlat",
       !is.na(arcas) ~ "arcasHLA",
       TRUE ~ NA_character_
     )
   } else if (locus %in% c("DQB1")){
     output <- case_when(
-      !is.na(phlat) ~ "phlat",
+      !is.na(phlat) & include_phlat == T ~ "phlat",
       !is.na(arcas) ~ "arcasHLA",
       TRUE ~ NA_character_
     )
   } else {
     output <- case_when(
       !is.na(arcas) ~ "arcasHLA",
-      !is.na(phlat) ~ "phlat",
+      !is.na(phlat) & include_phlat == T ~ "phlat",
       TRUE ~ NA_character_
     )
   }
@@ -382,7 +382,7 @@ composite_selector <- function(arcas, opti, phlat, selection){
 
 # Takes an accuracy df from compare_hla or calculate_all_hla_accuracy
 # and applies composite_picker and composite_selector to create a composite genotyper
-create_composite_df <- function(df){
+create_composite_df <- function(df, include_phlat = T, composite_name = "composite"){
   df <- df %>% 
     pivot_wider(names_from = "genotyper", values_from = c("accuracy", "allele")) %>% 
     # Pick genotyper with composite_picker
@@ -392,10 +392,11 @@ create_composite_df <- function(df){
         arcas = allele_arcasHLA,
         opti = allele_optitype, 
         phlat = allele_phlat, 
-        field = field), 
+        field = field,
+        include_phlat = include_phlat), 
       composite_picker))) %>% 
     # Isolate composite accuracy values with composite_selector
-    mutate(accuracy_composite = try(pmap_dbl(
+    mutate(accuracy_comp = try(pmap_dbl(
       list(
         arcas = accuracy_arcasHLA, 
         opti = accuracy_optitype, 
@@ -403,7 +404,7 @@ create_composite_df <- function(df){
         selection = composite_source), 
       composite_selector))) %>% 
     # Isolate composite alleles with composite_selector
-    mutate(allele_composite = try(pmap(
+    mutate(allele_comp = try(pmap(
       list(
         arcas = allele_arcasHLA, 
         opti = allele_optitype, 
@@ -417,7 +418,8 @@ create_composite_df <- function(df){
       contains(c("allele", "accuracy")),
       names_to = c(".value", "genotyper"),
       names_sep = "_"
-    )
+    ) %>% 
+    mutate(genotyper = ifelse(genotyper == "comp", composite_name, genotyper))
   return(df)
 }
 

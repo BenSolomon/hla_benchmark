@@ -12,9 +12,10 @@ output: html_notebook
 ```{r, message = F}
 library(tidyverse)
 library(cowplot)
+library(scales)
 source("data_import_functions.R")
 source("calculation_functions.R")
-source("ggplot_layouts.R")
+source("figure_format_functions.R")
 all_hla <- readRDS("all_hla_drb345_filtered.RDS")
 isb_path <- "/labs/khatrilab/solomonb/covid/isb"
 isb_samples <- read_tsv("/labs/khatrilab/solomonb/covid/isb/logs/210217_232725/parallel.log") %>% 
@@ -59,7 +60,9 @@ accuracy_df
 ```{r}
 composite_accuracy_df <- accuracy_df %>% 
   filter(grepl("BL$", sample)) %>% 
-  create_composite_df()
+  create_composite_df(include_phlat = T, composite_name = "composite.p") %>% 
+  create_composite_df(include_phlat = F, composite_name = "composite.np")
+  
 composite_accuracy_df
 ```
 
@@ -73,12 +76,15 @@ composite_loci_accuracy_plt
 ```
 ### Difference between composite and single genotypers
 ```{r}
+reference <- "composite.p"
+genotypers <- unique(composite_accuracy_df$genotyper)
+
 composite_loci_difference_plt <- composite_accuracy_df %>% 
   calculate_summary_df() %>% 
   select(-sd, - se) %>%
   pivot_wider(names_from = "genotyper", values_from = "mean_accuracy") %>% 
-  pivot_longer(contains(c("arcasHLA", "hlaminer", "optitype", "phlat")), names_to = "genotyper", values_to = "genotyper_accuracy") %>% 
-  mutate(mean_accuracy = composite - genotyper_accuracy) %>% 
+  pivot_longer(setdiff(genotypers, reference), names_to = "genotyper", values_to = "genotyper_accuracy") %>% 
+  mutate(mean_accuracy = !!sym(reference) - genotyper_accuracy) %>% 
   gg_summary_hla_accuracy(color_label = "Composite -\nindividual\ngenotyper\naccuracy") +
   scale_fill_gradientn(colors = RColorBrewer::brewer.pal(11, "BrBG"), limits = c(-0.25,0.25), na.value = "transparent", oob=squish)
 composite_loci_difference_plt
@@ -95,14 +101,18 @@ composite_average_accuracy_plt <- averaged_composite_accuracy %>%
   gg_summary_hla_accuracy()
 composite_average_accuracy_plt
 
+reference <- "composite.p"
+genotypers <- unique(composite_accuracy_df$genotyper)
+
 composite_average_difference_plt <- averaged_composite_accuracy %>% 
   calculate_summary_df() %>% 
   select(-sd, - se) %>%
   pivot_wider(names_from = "genotyper", values_from = "mean_accuracy") %>% 
-  pivot_longer(contains(c("arcasHLA", "hlaminer", "optitype", "phlat")), names_to = "genotyper", values_to = "genotyper_accuracy") %>% 
-  mutate(mean_accuracy = composite - genotyper_accuracy) %>% 
+  pivot_longer(setdiff(genotypers, reference), names_to = "genotyper", values_to = "genotyper_accuracy") %>% 
+  mutate(mean_accuracy = !!sym(reference) - genotyper_accuracy) %>% 
   gg_summary_hla_accuracy(color_label = "Composite -\nindividual\ngenotyper\naccuracy") +
   scale_fill_gradientn(colors = RColorBrewer::brewer.pal(11, "BrBG"), limits = c(-0.25,0.25), na.value = "transparent", oob=squish)
+# composite_average_difference_plt$layers[[1]]$aes_params$colour <- "black"
 composite_average_difference_plt
 ```
 # Combined plots
