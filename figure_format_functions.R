@@ -121,7 +121,7 @@ gg_summary_hla_accuracy <- function(df, color_label = "Accuracy", color = "plasm
 
 ### Expects format from calculation_functions::calculate_summary_df
 ### Creates a table of mean accuracy and standard error
-flex_summary_hla_accuracy_2 <- function(df, nesting_vars = c("field", "genotyper")){
+flex_summary_hla_accuracy <- function(df, nesting_vars = c("field", "genotyper")){
   # Input check
   possible_vars <- setdiff(names(df), c("locus", "mean_accuracy", "sd", "se"))
   if (!setequal(nesting_vars, possible_vars)){
