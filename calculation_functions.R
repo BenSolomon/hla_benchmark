@@ -335,7 +335,7 @@ calculate_drb345_accuracy <- function(df, score_absent_predictions=F){
     compare_hla(
       hla_df = .,
       reference = "invitro",
-      exclude_missing = F,
+      method = "accuracy",
       match_drb345_na = F)
 }
 
@@ -347,7 +347,7 @@ calculate_all_hla_accuracy <- function(df){
     compare_hla(
       hla_df = ., 
       reference = "invitro", 
-      exclude_missing = F)
+      method = "accuracy")
   
   drb345_df <- all_hla_drb345_filtered %>% 
     calculate_drb345_accuracy()

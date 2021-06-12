@@ -249,6 +249,50 @@ drb345_accuracy_plt <- drb345_accuracy_comparison %>%
 drb345_accuracy_plt
 ```
 
+```{r}
+### Accuracy table, adapted from flex_summary_hla_accuracy
+drb345_table <- drb345_accuracy_comparison %>% 
+  mutate(genotyper_2 = reformat_hla_genotyper(genotyper_2)) %>% 
+  unite(genotyper, genotyper_2, genotyper, sep = " ") %>%
+  mutate(field = reformat_hla_field(field)) %>% 
+  mutate(genotyper = reformat_hla_genotyper(genotyper)) %>% 
+  mutate(cell_value = sprintf("%s %s %s", round(mean_accuracy,2),"\u00B1",round(se,2) )) %>%
+  mutate(cell_value = ifelse(grepl("NA", cell_value), NA, cell_value)) %>% 
+  select(-sd,-se, -mean_accuracy) %>% 
+  pivot_wider(names_from = c("field","genotyper"), values_from = "cell_value", names_sep = "-") %>% 
+  select(locus,
+         `Field 1-arcasHLA Unfiltered`,
+         `Field 1-arcasHLA Filtered`,
+         `Field 1-HLAminer Unfiltered`,
+         `Field 1-HLAminer Filtered`,
+         `Field 2-arcasHLA Unfiltered`,
+         `Field 2-arcasHLA Filtered`,
+         `Field 2-HLAminer Unfiltered`,
+         `Field 2-HLAminer Filtered`,
+         `Field 3-arcasHLA Unfiltered`,
+         `Field 3-arcasHLA Filtered`,
+         `Field 3-HLAminer Unfiltered`,
+         `Field 3-HLAminer Filtered`
+  )
+df_key <- suppressWarnings({tibble(col_keys = names(drb345_table)) %>% 
+    separate(col_keys, into = c("field", "genotyper"), sep = "-", remove = F) %>%
+    separate(genotyper, into = c("genotyper", "filter"), sep = " ") %>% 
+    drop_na()})
+drb345_table %>% 
+  flextable() %>% 
+  colformat_char(na_str = "---") %>% 
+  set_header_df(mapping = df_key, key = "col_keys") %>% 
+  merge_h(part = "header") %>% 
+  theme_vanilla() %>% 
+  # vline(j=c(1,5,9), border = fp_border_default()) %>%
+  # vline(j=c(3,7,11), border = fp_border_default()) 
+  vline(j=seq(1,12, by = 2), border = fp_border_default()) %>% 
+  fix_border_issues() %>% 
+  fontsize(size = 8, part = "all") %>% 
+  print(preview = "pptx")
+```
+
+
 
 ```{r}
 # saveRDS(drb345_accuracy, "drb345_accuracy.RDS")

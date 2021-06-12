@@ -3,9 +3,9 @@ library(flextable)
 
 
 ### Prettifies and orders HLA fields
-reformat_hla_field <- function(field_vector){
+reformat_hla_field <- function(field_vector, reverse = F){
   suppressWarnings(
-    field_vector %>% 
+    output <- field_vector %>% 
       factor() %>% 
       fct_recode(
         "Field 1" = "field_1",
@@ -17,12 +17,14 @@ reformat_hla_field <- function(field_vector){
         "Field 2",
         "Field 3"
       ))
+  if (reverse == T){output <- fct_rev(output)}
+  return(output)
 }
 
 ### Prettifies and orders HLA genotypers
-reformat_hla_genotyper <- function(genotyper_vector){
+reformat_hla_genotyper <- function(genotyper_vector, reverse = F){
   suppressWarnings(
-    genotyper_vector %>% 
+    output <- genotyper_vector %>% 
       factor() %>% 
       fct_recode(
         "Ground truth" = "invitro",
@@ -39,12 +41,14 @@ reformat_hla_genotyper <- function(genotyper_vector){
         "PHLAT",
         "HLAminer"
       ))
+  if (reverse == T){output <- fct_rev(output)}
+  return(output)
 }
 
 ### Prettifies and orders HLA loci
-reformat_hla_loci <- function(loci_vector){
+reformat_hla_loci <- function(loci_vector, reverse = F){
   suppressWarnings(
-    loci_vector %>% 
+    output <- loci_vector %>% 
       factor() %>% 
       fct_recode(
         "All MHC" = "MHC All"
@@ -54,6 +58,8 @@ reformat_hla_loci <- function(loci_vector){
         "MHC II",
         "MHC I"
       ))
+  if (reverse == T){output <- fct_rev(output)}
+  return(output)
 }
 
 
@@ -141,17 +147,17 @@ flex_summary_hla_accuracy <- function(df){
 ### Only displays one HLA field, set by field_selection
 gg_allele_hla_accuracy <- function(df, color_label = "Accuracy", field_selection = "field_2", color = "plasma"){
   suppressMessages({
-    accuracy_df %>% 
+    df %>% 
       unnest(reference) %>% 
       filter(field == field_selection) %>%
       filter(allele != "NA") %>% 
       mutate(match = map2_dbl(reference, allele, function(x,y) sum(x %in% y, na.rm = T))) %>% 
       group_by(locus, reference, genotyper) %>% 
       summarise(accuracy = mean(match), n = n()) %>%
-      # ggplot(aes(x=reference, y = genotyper))+
+      mutate(genotyper = reformat_hla_genotyper(genotyper)) %>% 
+      mutate(locus = reformat_hla_loci(locus)) %>% 
       ggplot(aes(x=genotyper, y = reference))+
       geom_point(aes(fill = accuracy, size = n), shape = 21, color = "black")+
-      # facet_wrap(~ locus, ncol = 1, scales = "free_x",  strip.position="right")+
       facet_wrap(~ locus, nrow = 1, scales = "free_y",)+
       scale_fill_viridis_c(option = color) +
       scale_size_continuous(breaks = c(5,25,50,100), range = c(1,10)) +
@@ -161,8 +167,22 @@ gg_allele_hla_accuracy <- function(df, color_label = "Accuracy", field_selection
   })
 }
 
-
-
+gg_individual_hla_accuracy <- function(df, color_label = "Accuracy", field_selection = "field_2", color = "plasma"){
+  suppressMessages({
+    df %>% 
+      filter(field == field_selection) %>% 
+      mutate(field = reformat_hla_field(field)) %>% 
+      mutate(genotyper = reformat_hla_genotyper(genotyper, reverse = T)) %>% 
+      mutate(locus = reformat_hla_loci(locus)) %>% 
+      ggplot(aes(x = sample, y = genotyper, fill = accuracy)) + 
+      geom_tile() +
+      theme_classic() +
+      facet_grid(locus ~.) +
+      scale_fill_viridis_c(na.value = "transparent", option = color) +
+      theme(axis.text.x = element_blank(), axis.ticks = element_blank()) +
+      labs(x = "Sample", y = "", fill = color_label)
+  })
+}
 
 gg_multilevel_roc <- function(df){
   roc_plot <- df %>% 
