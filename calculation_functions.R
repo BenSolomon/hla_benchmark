@@ -2,12 +2,36 @@ library(tidyverse)
 library(checkmate)
 
 
+# Bray-Curtis similarity is ideal metric for matching when ref and comp both have 2 alleles
+# Will be used inside of allele_match, which also has specifications for when n allele != 2
+bray_match <- function(ref, comp){
+  bc_output <- bind_rows(
+    tibble(label = "ref", allele = ref),
+    tibble(label = "comp", allele = comp)
+  ) %>%
+    table() %>% 
+    vegan::vegdist(method = "bray") %>% 
+    as.numeric() %>% 
+    (function(x) 1-x)
+  return(bc_output)
+}
+
+
 ### Allele matching function
-allele_match <- function(ref,comp,ground_truth=T, verbose=F, count_NA_match = F){
-  display_message <-  ifelse(verbose == F, "message", "none")
+allele_match <- function(ref,comp,ground_truth=T, verbose=F, count_NA_match = F, mode = "accuracy"){
+  # Input checks
+  arg_col <- makeAssertCollection()
+  assertChoice(mode, c("accuracy", "success"), add = arg_col)
+  assertLogical(ground_truth, add = arg_col)
+  assertLogical(verbose, add = arg_col)
+  assertLogical(count_NA_match, add = arg_col)
+  if (arg_col$isEmpty()==F) {map(arg_col$getMessages(),print);reportAssertions(arg_col)}
+  
+  display_message <-  ifelse(verbose == F, "message", "none") # Effect of verbose on suppressMessages
   
   suppressMessages({
-    # If allele ends with an NA string, convert entire object to NA
+    # If allele ends with an NA string, convert entire object to NA 
+    # e.g. 01:01:NA should be NA for field 3
     ref[grepl("NA$",ref)] <- NA
     comp[grepl("NA$",comp)] <- NA
     
@@ -15,7 +39,7 @@ allele_match <- function(ref,comp,ground_truth=T, verbose=F, count_NA_match = F)
     n_ref <- sum(!is.na(ref))
     n_comp <- sum(!is.na(comp))
     
-    # How to handle NAs in both reference and comparison
+    # How to handle complete NAs in both reference and comparison
     if(n_ref==0 & n_comp==0){
       # Default: Return NA
       if (count_NA_match == F){message("No alleles for comparison");return(NA)}
@@ -24,33 +48,41 @@ allele_match <- function(ref,comp,ground_truth=T, verbose=F, count_NA_match = F)
       else {return(1)}
     }
     
-    # If ref is ground_truth, return NA if all ref alleles are NA
-    if(n_ref==0 & ground_truth==T){message("No ground truth alleles");return(NA)}
     # Cannot have more than two alleles
     if(n_ref > 2 | n_comp > 2){message("Invalid number of alleles");return(NA)}
+    # Cannot have 0 ref alleles when ref is a ground truth
+    if(n_ref==0 & ground_truth==T){message("No ground truth alleles");return(NA)}
     
-    
-    # If comparing to a ground_truth, only penalize NAs in comp, not those in ref
-    if (n_ref == 1 & ground_truth == T){return(sum(any(ref[!is.na(ref)] %in% comp, na.rm = T)))}
-    
-    # If unequal number of NAs between ref and comp, fill smaller with random placeholder
-    ## If both genotypes only have one allele, don't want to fill with random placeholder
-    ## Because this would automatically create a non-match
-    if (n_ref != n_comp){
-      comp <-  c(comp[!is.na(comp)], sample(c("fill_1","fill_2"), 2-n_comp, replace = F))
-      ref <-  c(ref[!is.na(ref)], sample(c("fill_3","fill_4"), 2-n_ref, replace = F))
+    # Success = if comparison prediction made, how well matched (i.e. no NA penalty)
+    # Conditions where bc_match cannot be used to calculate success (i.e. n_allele != 2)
+    if (mode == "success"){
+      if(n_comp == 0){return(NA)} # If no prediction, discard
+      if (n_ref != n_comp){
+        ref <- unique(ref[!is.na(ref)])  # Only 
+        success <- sum(comp %in% ref)/n_comp
+        return(success)}
     }
     
-    # Calculate bray-curtis similarity between alleles
-    accuracy <- bind_rows(
-      tibble(label = "ref", allele = ref),
-      tibble(label = "comp", allele = comp)
-    ) %>%
-      table() %>% 
-      vegan::vegdist(method = "bray") %>% 
-      as.numeric() %>% 
-      (function(x) 1-x)
-    return(accuracy)
+    # Accuracy = how well matched even if missing predications (i.e. NAs penalized)
+    # Conditions where bc_match cannot be used to calculate accuracy (i.e. n_allele != 2)
+    if(mode == "accuracy"){
+      ## If ref is a ground truth, only penalize NAs in comp, not those in ref
+      if (n_ref == 1 & ground_truth == T){
+        ref <- ref[!is.na(ref)]
+        accuracy <- sum(any(ref %in% comp, na.rm = T))
+        return(accuracy)}
+      # If unequal number of NAs between ref and comp, fill smaller with random placeholder
+      ## If both genotypes only have one allele, don't want to fill with random placeholder
+      ## Because this would automatically create a non-match
+      if (n_ref != n_comp & mode == "accuracy"){
+        comp <-  c(comp[!is.na(comp)], sample(c("fill_1","fill_2"), 2-n_comp, replace = F))
+        ref <-  c(ref[!is.na(ref)], sample(c("fill_3","fill_4"), 2-n_ref, replace = F))}     
+    }
+    
+    # Calculate bray-curtis similarity between alleles 
+    # Used for success and accuracy when n_alleles == 2
+    # or expanded to 2 by accuracy placeholders
+    return(bray_match(ref = ref, comp = comp))
   },
   classes = display_message) # Displays messages based on verbose
 }
@@ -80,39 +112,42 @@ allele_match <- function(ref,comp,ground_truth=T, verbose=F, count_NA_match = F)
 # }
 
 # unit_test <- tribble(
-#   ~reference, ~comparison, ~expected_standard, ~expected_agreement,
-#   c("03", "03"), c("03", "03"), 1, 1,
-#   c("03", "01"), c("03", "01"), 1, 1,
-#   "03", c("03", "03"), 1, 0.5,
-#   c("03", "01"), c("03", "03"), 0.5, 0.5,
-#   c("03", "03"), c("03", "01"), 0.5, 0.5,
-#   c("03", "01"), c(NA, "01"), 0.5, 0.5,
-#   c("03", "03"), "03", 0.5, 0.5,
-#   c("01", NA), c(NA, NA), 0, 0,
-#   "01", c(NA, NA), 0, 0,
-#   c("01", NA), c("01", NA), 1, 1,
-#   "01", c("01", NA), 1, 1,
-#   c("03", "03"), c("01", "01"), 0, 0,
-#   c("03", "01"), NA, 0, 0,
-#   c(NA, NA), c(NA, NA), NA, NA,
-#   c(NA, NA), NA, NA, NA,
-#   NA, NA, NA, NA,
-#   c("03","03","03"), c("01", "01"), NA, NA
+#   ~reference, ~comparison, ~expected_success, ~expected_accuracy, ~expected_agreement,
+#   c("03", "03"), c("03", "03"), 1, 1, 1,
+#   c("03", "01"), c("03", "01"), 1, 1, 1,
+#   "03", c("03", "03"), 1, 1, 0.5,
+#   c("03", "01"), c("03", "03"), 0.5, 0.5, 0.5,
+#   c("03", "03"), c("03", "01"), 0.5, 0.5, 0.5,
+#   c("03", "01"), c(NA, "01"), 1, 0.5, 0.5,
+#   c("03", "03"), "03", 1, 0.5, 0.5,
+#   c("01", NA), c(NA, NA), NA, 0, 0,
+#   "01", c(NA, NA), NA, 0, 0,
+#   c("01", NA), c("01", NA), 1, 1, 1,
+#   "01", c("01", NA), 1, 1, 1,
+#   c("03", "03"), c("01", "01"), 0, 0, 0,
+#   c("03", "01"), NA, NA, 0, 0,
+#   c(NA, NA), c(NA, NA), NA, NA, NA,
+#   c(NA, NA), NA, NA, NA, NA,
+#   NA, NA, NA, NA, NA,
+#   c("03","03","03"), c("01", "01"), NA, NA, NA
 # )
-# unit_test
+# # unit_test
 # 
 # unit_test_output <- unit_test %>%
 #   mutate(
-#     calculated_standard = map2_dbl(reference, comparison, allele_match, ground_truth = T),
-#     calculated_agreement = map2_dbl(reference, comparison, allele_match, ground_truth = F), 
-#     match_standard = expected_standard == calculated_standard,
-#     match_agreement = expected_agreement == calculated_agreement)
+#     calculated_success = map2_dbl(reference, comparison, allele_match, ground_truth = T, mode = "success"),
+#     match_success = expected_success == calculated_success,
+#     calculated_accuracy = map2_dbl(reference, comparison, allele_match, ground_truth = T),
+#     match_accuracy = expected_accuracy == calculated_accuracy,
+#     calculated_agreement = map2_dbl(reference, comparison, allele_match, ground_truth = F),
+#     match_agreement = expected_agreement == calculated_agreement) %>% 
+#   select(reference, comparison, contains("success"), contains("accuracy"), contains("agreement"))
 # unit_test_output
 
 
 compare_hla<- function(hla_df, 
                        reference = "invitro", 
-                       exclude_missing=T, 
+                       method = "accuracy", 
                        penalize_extra_drb345 = T, 
                        penalize_extra_classic = F,
                        match_drb345_na = T){
@@ -121,7 +156,7 @@ compare_hla<- function(hla_df,
   hla_df_columns <- c("sample", "allele_id", "locus", "field_1", "field_2", "field_3", "genotyper")
   assertNames(names(hla_df), permutation.of = hla_df_columns, .var.name = "hla_df column names", add = arg_col)
   assertChoice(reference, unique(hla_df$genotyper), add = arg_col)
-  assertLogical(exclude_missing, add = arg_col)
+  assertChoice(method, c("accuracy", "success"), add = arg_col)
   assertLogical(penalize_extra_drb345, add = arg_col)
   assertLogical(penalize_extra_classic, add = arg_col)
   if (arg_col$isEmpty()==F) {map(arg_col$getMessages(),print);reportAssertions(arg_col)}
@@ -135,24 +170,18 @@ compare_hla<- function(hla_df,
     pivot_wider(names_from = "genotyper", names_prefix = "genotyper_", values_from = "allele", values_fill = list(NA)) %>%
     dplyr::rename("reference" = contains(reference)) %>%
     pivot_longer(contains("genotyper"),  names_to = "genotyper", values_to = "allele",names_prefix = "genotyper_")
-  if (exclude_missing == T){
-    df <- df %>%
-      filter_at(vars(c(reference, allele)), function(x) !is.na(x))
-      # mutate(n_reference = map_dbl(reference, function(x) sum(!is.na(x) & !grepl("NA", x)))) %>%
-      # mutate(n_allele = map_dbl(allele, function(x) sum(!is.na(x) & !grepl("NA", x))))
-      # filter_at(vars(contains("n_")), function(x) x ==2) # Removed b/c excluding samples where invitro n = 1 and sample n = 2, which is unwanted
-      # filter(n_allele == 2)
-  }
   df_drb345 <- df %>% 
     filter(grepl("^DRB[345]",locus)) %>% 
     mutate(accuracy = map2_dbl(reference, allele, allele_match, 
                                ground_truth = !penalize_extra_drb345, 
-                               count_NA_match = match_drb345_na))
+                               count_NA_match = match_drb345_na,
+                               mode = method))
   df_other <- df %>% 
     filter(grepl("^[ABC]",locus) | grepl("^D[PQR][AB]1", locus)) %>% 
     mutate(accuracy = map2_dbl(reference, allele, allele_match, 
                                ground_truth = !penalize_extra_classic, 
-                               count_NA_match = F))
+                               count_NA_match = F,
+                               mode = method))
   df <- bind_rows(
     df_other,
     df_drb345
