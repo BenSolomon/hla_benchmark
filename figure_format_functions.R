@@ -121,25 +121,44 @@ gg_summary_hla_accuracy <- function(df, color_label = "Accuracy", color = "plasm
 
 ### Expects format from calculation_functions::calculate_summary_df
 ### Creates a table of mean accuracy and standard error
-flex_summary_hla_accuracy <- function(df){
+flex_summary_hla_accuracy_2 <- function(df, nesting_vars = c("field", "genotyper")){
+  # Input check
+  possible_vars <- setdiff(names(df), c("locus", "mean_accuracy", "sd", "se"))
+  if (!setequal(nesting_vars, possible_vars)){
+    unused <- paste(setdiff(possible_vars, nesting_vars), collapse = ", ")
+    stop(
+      sprintf("ERROR: Unused column(s) \"%s\"\n\t Include unused column(s) in nesting_vars or further summarize input df", 
+              unused))
+  }
+  
   df <- df %>% 
     mutate(field = reformat_hla_field(field)) %>% 
-    mutate(genotyper = reformat_hla_genotyper(genotyper)) %>% 
+    mutate_at(vars(contains("genotyper")), reformat_hla_genotyper) %>% 
     mutate(cell_value = sprintf("%s %s %s", round(mean_accuracy,2),"\u00B1",round(se,2) )) %>%
     mutate(cell_value = ifelse(grepl("NA", cell_value), NA, cell_value)) %>% 
     select(-sd,-se, -mean_accuracy) %>% 
-    pivot_wider(names_from = c("field","genotyper"), values_from = "cell_value", names_sep = "-") 
+    pivot_wider(names_from = nesting_vars, values_from = "cell_value", names_sep = "-") 
+  
   df_key <- suppressWarnings({tibble(col_keys = names(df)) %>% 
-    separate(col_keys, into = c("field", "genotyper"), sep = "-", remove = F) %>%
-    drop_na()})
-  df %>% 
+      filter(!grepl("locus", col_keys)) %>% 
+      separate(col_keys, into = nesting_vars, sep = "-", remove = F) %>%
+      mutate_at(vars(contains("genotyper")), reformat_hla_genotyper) %>% 
+      arrange_at(nesting_vars) %>% 
+      mutate_all(as.character)
+  })
+  
+  vline_var <- tail(nesting_vars,1)
+  vlines_sequence <- seq(1,nrow(df_key),by = length(unique(df_key[[vline_var]])))
+  df <- df %>% 
+    select(locus, df_key$col_keys) %>% 
     flextable() %>% 
     colformat_char(na_str = "---") %>% 
     set_header_df(mapping = df_key, key = "col_keys") %>% 
     merge_h(part = "header") %>% 
     theme_vanilla() %>% 
-    vline(j=c(1,5,9), border = fp_border_default()) %>% 
+    vline(j=vlines_sequence, border = fp_border_default()) %>%
     fix_border_issues()
+  return(df)
 }
 
 ### Expects format from calculation::compare_hla
