@@ -311,7 +311,7 @@ make_drb_scaffold <- function(samples){
 # score_absent_predictions determines the absence of a prediction is itself considered
 # informative and given a pseudovalue "X" which is then scored by allele_match.
 # Expects df in the same format as from format_hla_table  
-calculate_drb345_accuracy <- function(df, score_absent_predictions=F){
+calculate_drb345_accuracy <- function(df, score_absent_predictions=F, method = "accuracy"){
   # Input checks
   arg_col <- makeAssertCollection()
   df_columns <- c("sample", "allele_id", "locus", "field_1", "field_2", "field_3", "genotyper")
@@ -319,39 +319,50 @@ calculate_drb345_accuracy <- function(df, score_absent_predictions=F){
   assertLogical(score_absent_predictions, add = arg_col)
   if (arg_col$isEmpty()==F) {map(arg_col$getMessages(),print);reportAssertions(arg_col)}
   
-  #Function
+  # Build a scaffold of valid sample, field, genotyper combinations
   drb_scaffold <- make_drb_scaffold(unique(df$sample))
   
   df <- df %>% 
-    pivot_longer(contains("field"), names_to = "field", values_to = "allele") %>% 
+    pivot_longer(contains("field"), names_to = "field", values_to = "allele") %>%
+    # 1st scaffold bind: prevents "X" assignment if not a valid combination
     right_join(drb_scaffold, by = names(drb_scaffold)) 
   
+  # If considering it a match when both comp and ref have NAs, convert NAs to "X"
+  # Done for DRB345 since correctly failing to assign a genotype can be informative
   if (score_absent_predictions==T){
     df <- df %>% mutate(allele = ifelse(is.na(allele), "X", allele))
   }
+  
+  # Modify scaffold for second application
+  drb_scaffold <- drb_scaffold %>% 
+    select(-allele_id) %>% 
+    filter(genotyper != "invitro") %>% 
+    distinct()
   
   df %>% 
     pivot_wider(names_from = "field", values_from = "allele", values_fn = function(x) ifelse(length(x) > 1, NA, x)) %>% 
     compare_hla(
       hla_df = .,
       reference = "invitro",
-      method = "accuracy",
-      match_drb345_na = F)
+      method = method,
+      match_drb345_na = T) %>% 
+    # 2nd scaffold bind: excludes non-valid combinations created by pivot 
+    right_join(drb_scaffold, by = names(drb_scaffold)) 
 }
 
 # Wrapper to combine accuracy calculation for drb345 and non-drb345 loci
 # Expects a df in the form of format_hla_table
-calculate_all_hla_accuracy <- function(df){
+calculate_all_hla_accuracy <- function(df, method = "accuracy"){
   non_drb345_df <- df %>% 
     filter(!(grepl("^DRB[345]", locus))) %>% 
     compare_hla(
       hla_df = ., 
       reference = "invitro", 
-      method = "accuracy")
+      method = method)
   
   drb345_df <- df %>% 
     filter(grepl("^DRB[345]", locus)) %>% 
-    calculate_drb345_accuracy()
+    calculate_drb345_accuracy(method = method)
   
   df <- bind_rows(non_drb345_df, drb345_df)
   
