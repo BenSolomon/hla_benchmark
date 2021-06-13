@@ -8,9 +8,8 @@ output: html_notebook
 library(tidyverse)
 library(cowplot)
 source("data_import_functions.R")
-source("ggplot_layouts.R")
 source("figure_format_functions.R")
-source("accuracy_functions.R")
+source("calculation_functions.R")
 isb_path <- "/labs/khatrilab/solomonb/covid/isb"
 isb_samples <- read_tsv("/labs/khatrilab/solomonb/covid/isb/logs/210217_232725/parallel.log") %>% 
   separate(Command, into = c(NA, "sample"), sep = " ") %>% 
@@ -23,10 +22,7 @@ all_hla <- readRDS("all_hla_drb345_filtered.RDS")
 
 # Time-specific accuracy
 ```{r, message==F, warning=F}
-accuracy_df <- compare_hla(hla_df = all_hla, 
-            reference = "invitro", 
-            exclude_missing = F,
-            penalize_extra_drb345 = T) 
+accuracy_df <- calculate_all_hla_accuracy(all_hla) 
 ```
 
 ```{r, fig.width = 12, fig.height=4}
@@ -55,11 +51,19 @@ time_split_plt <- plot_grid(
 )
 time_split_plt
 ```
+### Time accuracy table
+```{r}
+bind_rows(
+  BL_accuracy %>% mutate(time = "T1"),
+  AC_accuracy %>% mutate(time = "T2")
+) %>% 
+  flex_summary_hla_accuracy(nesting_vars = c("field", "genotyper", "time")) %>% 
+  fontsize(size = 8, part = "all") %>% 
+  print(preview = "pptx")
+```
 
 
 # Sample agreement
-
-
 
 ```{r}
 collections <- c("AC","BL")
@@ -119,7 +123,16 @@ agreement_plt <- plot_grid(
 agreement_plt
 ```
 
-
+### Observed v. expected table
+```{r}
+bind_rows(
+  observed_agreement_df %>% calculate_summary_df() %>%  mutate(oe = "Obs"),
+  predicted_agreement_df %>% mutate(oe = "Exp")
+) %>% 
+  flex_summary_hla_accuracy(nesting_vars = c("field", "genotyper", "oe")) %>%
+fontsize(size = 8, part = "all") %>%
+print(preview = "pptx")
+```
 
 # Combined plot
 

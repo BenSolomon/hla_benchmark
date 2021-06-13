@@ -349,7 +349,8 @@ calculate_all_hla_accuracy <- function(df){
       reference = "invitro", 
       method = "accuracy")
   
-  drb345_df <- all_hla_drb345_filtered %>% 
+  drb345_df <- df %>% 
+    filter(grepl("^DRB[345]", locus)) %>% 
     calculate_drb345_accuracy()
   
   df <- bind_rows(non_drb345_df, drb345_df)
