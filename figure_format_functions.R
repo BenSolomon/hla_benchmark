@@ -134,7 +134,9 @@ flex_summary_hla_accuracy <- function(df, nesting_vars = c("field", "genotyper")
   df <- df %>% 
     mutate(field = reformat_hla_field(field)) %>% 
     mutate_at(vars(contains("genotyper")), reformat_hla_genotyper) %>% 
-    mutate(cell_value = sprintf("%s %s %s", round(mean_accuracy,2),"\u00B1",round(se,2) )) %>%
+    mutate(cell_value = ifelse(!is.na(se), 
+                               sprintf("%s %s %s", round(mean_accuracy,2),"\u00B1",round(se,2)),
+                               sprintf("%s", round(mean_accuracy,2)))) %>%
     mutate(cell_value = ifelse(grepl("NA", cell_value), NA, cell_value)) %>% 
     select(-sd,-se, -mean_accuracy) %>% 
     pivot_wider(names_from = nesting_vars, values_from = "cell_value", names_sep = "-") 

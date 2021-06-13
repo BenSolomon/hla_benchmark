@@ -282,6 +282,46 @@ create_drb345_df <- function(ratio_df, copy_number_df){
     drop_na()
 }
 
+# Predict DRB345 loci based on KNN and DRB345/DRB1 read ratios
+# Expects output of create_drb345_df
+apply_drb345_knn <- function(df, model){
+  df %>% 
+    bind_cols(
+      model %>% predict(new_data = df),
+      model %>% predict(new_data = df, type = 'prob')
+    ) %>% 
+    mutate(copy_number = factor(copy_number))
+}
+
+# Filter DF of DRB345 alleles based on predicted number of DRB345 loci from KNN
+# drb_predictions expects output of apply_drb345_knn
+# all_hla_df expects output of combine_HLA_import
+filter_drb_by_KNN <- function(drb_predictions, all_hla_df){
+  drb_key <- drb_predictions %>% 
+    select(sample, locus, copy_number, .pred_class)
+  drb_filtered <- all_hla_df %>% 
+    filter(genotyper != "invitro" & grepl("^DRB[345]", locus)) %>% 
+    left_join(drb_key, by = c("sample", "locus")) %>% 
+    mutate(.pred_class = as.character(.pred_class)) %>% 
+    mutate_at(vars(c("copy_number", ".pred_class")), function(x) ifelse(is.na(x), "0", x)) %>% 
+    filter(allele_id <= .pred_class) %>%  
+    select(-copy_number, -.pred_class)
+  return(drb_filtered)
+}
+# filter_drb_by_KNN(drb345_3p_predicted, pmid_3p_hla)
+
+# Wrapper around filter_drb_by_KNN that takes filtered DRB345 alleles and applies them to DF of all HLA loci
+# drb_predictions expects output of apply_drb345_knn
+# all_hla_df expects output of combine_HLA_import
+# samples is vector of unique samples to be included
+filter_drb_in_all_hla <- function(drb_predictions, all_hla_df, samples){
+  drb_filtered <- filter_drb_by_KNN(drb_predictions = drb_predictions, all_hla_df = all_hla_df)
+  all_hla_df %>% 
+    filter(!(grepl("^DRB[345]", locus) & genotyper != "invitro")) %>% 
+    bind_rows(drb_filtered) %>% 
+    filter(sample %in% samples)
+}
+
 # Creates an expanded df of all valid loci-field-genotyper combinations for drb345
 # Used to join data to include entries for absent predictions
 # Takes a list of samples create all combinations along
