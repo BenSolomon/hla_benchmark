@@ -124,7 +124,12 @@ hlaminer_import <- function(path, sample){
 ### Combined import function
 combine_HLA_import <- function(path, samples, invitro_path="hla_2020-10-23_1457.tsv", filter_invitro = F, expand_invitro = T){
   suppressMessages({
-    invitro <- invitro_import(path = invitro_path, exclude_comment_samples = filter_invitro)
+    if (is.null(invitro_path)){
+      invitro <- NULL
+      expand_invitro <- F
+    } else {
+      invitro <- invitro_import(path = invitro_path, exclude_comment_samples = filter_invitro)
+    }
     
     ### Every subject has molecular HLA typing, but may occur in the BL, AC, or CV timepoint
     ### This expands the molecular HLA typing from the timepoint it occurs to all other time points 
@@ -189,7 +194,7 @@ format_hla_table <- function(hla_table){
 hla_mapping_stats_import <- function(samples, log_dir){
   tibble(sample = samples) %>% 
     mutate(data = map(sample, function(x){
-      log_path <- sprintf("%s/%s/%s_arcas_genotype.log",log_dir,x,x)
+      log_path <- sprintf("%s/%s.genotype.log",log_dir,x)
       df <- tibble(lines = read_lines(log_path))
       if (any(grepl("error", df$lines, ignore.case = T))){
         NA
@@ -201,11 +206,11 @@ hla_mapping_stats_import <- function(samples, log_dir){
       }
     })) %>%
     unnest(data) %>% 
-    select(-data) %>% 
+    select(!(contains("data"))) %>% 
     separate(locus, into = c(NA, "locus"), sep = "-")
 }
-# arcas_log_dir <- sprintf("%s/logs/210309_155222",isb_path)
-# hla_mapping_stats_import(isb_samples, arcas_log_dir)
+# arcas_log_dir <- sprintf("%s/arcasHLA", isb_path)
+# alignment_stats_df <- hla_mapping_stats_import(isb_samples, arcas_log_dir)
 
 # Given path to log file, extracts times and duration of each step 
 # in sequencing pipeline as a data frame
