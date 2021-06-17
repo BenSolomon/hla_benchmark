@@ -221,11 +221,11 @@ drb345_filtered_accuracy <- bind_rows(
   all_hla %>% 
     filter(grepl("^DRB[345]", locus), genotyper == "invitro")
 ) %>% 
-  calculate_drb345_accuracy(score_absent_predictions = score_absent) 
+  calculate_drb345_accuracy(match_drb345_na = score_absent) 
 
 drb345_unfiltered_accuracy <- all_hla %>% 
     filter(grepl("^DRB[345]", locus)) %>% 
-    calculate_drb345_accuracy(score_absent_predictions = score_absent) 
+    calculate_drb345_accuracy(match_drb345_na = score_absent) 
 
 drb345_accuracy_comparison <- bind_rows(
   drb345_filtered_accuracy %>% 
@@ -270,10 +270,10 @@ drb345_table <- drb345_accuracy_comparison %>%
          `Field 2-HLAminer Unfiltered`,
          `Field 2-HLAminer Filtered`,
          `Field 3-arcasHLA Unfiltered`,
-         `Field 3-arcasHLA Filtered`,
-         `Field 3-HLAminer Unfiltered`,
-         `Field 3-HLAminer Filtered`
-  )
+         `Field 3-arcasHLA Filtered`
+  ) %>% 
+  mutate(`Field 3-HLAminer Unfiltered` = na_chr,
+         `Field 3-HLAminer Filtered` = na_chr)
 df_key <- suppressWarnings({tibble(col_keys = names(drb345_table)) %>% 
     separate(col_keys, into = c("field", "genotyper"), sep = "-", remove = F) %>%
     separate(genotyper, into = c("genotyper", "filter"), sep = " ") %>% 
@@ -288,6 +288,12 @@ drb345_table %>%
   # vline(j=c(3,7,11), border = fp_border_default()) 
   vline(j=seq(1,12, by = 2), border = fp_border_default()) %>% 
   fix_border_issues() %>% 
+  fontsize(size = 8, part = "all") %>% 
+  print(preview = "pptx")
+```
+```{r}
+calculate_summary_df(drb345_accuracy_comparison) %>% 
+  flex_summary_hla_accuracy() %>% 
   fontsize(size = 8, part = "all") %>% 
   print(preview = "pptx")
 ```
@@ -335,7 +341,7 @@ all_hla_drb345_filtered <- all_hla %>%
 # saveRDS(all_hla_drb345_filtered, "all_hla_drb345_filtered.RDS")
 # all_hla_drb345_filtered <- readRDS("all_hla_drb345_filtered.RDS")
 
-accuracy_df <- calculate_all_hla_accuracy(all_hla_drb345_filtered)
+accuracy_df <- calculate_all_hla_accuracy(all_hla_drb345_filtered, match_drb345_na = F)
 
 # saveRDS(accuracy_df, "isb_accuracy_drb345_filtered.RDS")
 # accuracy_df <- readRDS("isb_accuracy_drb345_filtered.RDS")

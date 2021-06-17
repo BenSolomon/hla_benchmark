@@ -1,6 +1,7 @@
 library(tidyverse)
 library(tidymodels)
 library(checkmate)
+library(lubridate)
 
 
 # Bray-Curtis similarity is ideal metric for matching when ref and comp both have 2 alleles
@@ -536,29 +537,37 @@ locus_average_accuracy <- function(df){
 
 # Converts accuracy df to format to be used in composite decision tree modeling
 # Accepts input from accuracy functions like calculate_all_hla_accuracy
-make_tree_input <- function(df, genotypers = c("arcasHLA", "optitype", "phlat")){
-  output <- suppressWarnings(
-    df %>% 
-      ungroup() %>% 
-      filter(genotyper %in% genotypers) %>% # Limit to only genotypers specified
-      mutate(present = map_lgl(allele, function(x) !all(is.na(x)))) %>% # ID predictions that only generated NAs
-      mutate(accuracy = ifelse(present == T, accuracy, NA)) %>% # Convert 0 accuracy to NA based on previous line
-      select(sample, locus, field, genotyper, accuracy, present) %>%  
-      # Pivot wider then longer to insert NAs at missing combinations
-      pivot_wider(names_from = "genotyper", values_from = c("accuracy", "present")) %>% 
-      pivot_longer(contains("accuracy"), names_to = "genotyper", values_to = "accuracy", names_prefix = "accuracy_") %>% 
-      # Find the maximum accuracy value for a sample-locus-field combo and keep only those genotypers acheiving that max
+# for_fit = T when input for building a model, for_fit=F when input for applying a model
+make_tree_input <- function(df, genotypers = c("arcasHLA", "optitype", "phlat"), for_fit = F){
+  output <- df %>% 
+    ungroup() %>% 
+    filter(genotyper %in% genotypers) %>% # Limit to only genotypers specified
+    mutate(present = map_lgl(allele, function(x) !all(is.na(x)))) %>% # ID predictions that only generated NAs
+    mutate(accuracy = ifelse(present == T, accuracy, NA)) %>% # Convert 0 accuracy to NA based on previous line
+    select(sample, locus, field, genotyper, accuracy, present) %>%  
+    # Pivot wider then longer to insert NAs at missing combinations
+    pivot_wider(names_from = "genotyper", values_from = c("accuracy", "present")) %>% 
+    pivot_longer(contains("accuracy"), names_to = "genotyper", values_to = "accuracy", names_prefix = "accuracy_") %>% 
+    mutate_if(is.character, factor) %>% 
+    mutate_if(is.logical, factor)
+  
+  # If using to fit the tree model, keep only the best predictions to train the model on
+  # Find the maximum accuracy value for a sample-locus-field combo and keep only those genotypers acheiving that max
+  if (for_fit == T){
+    output <- output %>%      
       group_by(sample, locus, field) %>% 
-      mutate(max_accuracy = max(accuracy, na.rm = T)) %>%
+      mutate(max_accuracy = ifelse(all(is.na(accuracy)), NA, max(accuracy, na.rm = T)))%>%
       ungroup() %>%
-      filter(accuracy == max_accuracy) %>% 
-      # COnvert sample to rownames, add index to make unique
-      mutate(sample = paste(sample, 1:n(), sep = "_")) %>% 
-      column_to_rownames("sample") %>% 
-      select(-accuracy, -max_accuracy) %>% 
-      mutate_if(is.character, factor) %>% 
-      mutate_if(is.logical, factor))
-  return(output)
+      filter(accuracy == max_accuracy & !is.na(max_accuracy)) %>% 
+      select(-accuracy, -max_accuracy) 
+  }
+  
+  # Convert sample to rownames, add index to make unique
+  output <- output %>% 
+    mutate(sample = paste(sample, 1:n(), sep = "_")) %>% 
+    column_to_rownames("sample") %>% 
+    
+    return(output)
 }
 # accuracy_df %>% make_tree_input()
 
@@ -571,11 +580,14 @@ make_tree_input <- function(df, genotypers = c("arcasHLA", "optitype", "phlat"))
 #     "full_output" = predictions of the model on the training + test set
 make_tree <- function(df,
                       train_split = 0.7, 
-                      outcome = "genotyper", 
+                      outcome = "genotyper",
+                      genotypers = c("arcasHLA", "optitype", "phlat"),
                       grid_search_levels = 4,
                       n_cores = 1,
                       seed1=123,seed2=234,seed3=345){
   # browser()
+  df <- make_tree_input(df, for_fit = T, genotypers = genotypers)
+  
   formula_string <- sprintf("%s ~ .", outcome)
   
   # Create train/test
@@ -622,12 +634,6 @@ make_tree <- function(df,
       final_fit %>% predict(new_data = df_test),
       final_fit %>% predict(new_data = df_test, type = 'prob') 
     )
-  # Predict outcomes on test+train set
-  full_output <- df %>% 
-    bind_cols(
-      final_fit %>% predict(new_data = df), 
-      final_fit %>% predict(new_data = df, type = 'prob') 
-    )
   
   # Calculate AUC
   prediction_var <- setdiff(names(testing_output)[grepl(".pred", names(testing_output))], ".pred_class")
@@ -639,27 +645,52 @@ make_tree <- function(df,
     "top_models_stats" = show_best(tree_rs, "roc_auc"),
     "best_model_stats" = select_best(tree_rs, "roc_auc"),
     "model" = final_fit,
-    "testing_predictions" = testing_output,
-    "full_predictions" = full_output,
     "auc" = auc
   )
   return(final_list)
 }
-# tree_model_list <- make_tree(best_accuracy_df %>% sample_frac(0.1), n_cores = 40)
-# suppressWarnings(rpart.plot::rpart.plot(tree_model_listt$model$fit))
 
-# Filter accuracy DF using predictions from classification tree made by make_tree
-# Accepts input from accuracy functions like calculate_all_hla_accuracy
-filter_by_tree <- function(df, model_list, name = "composite"){
-  key <- model_list$full_predictions %>% 
+
+# # Filter accuracy DF using predictions from classification tree made by make_tree
+# # Accepts input from accuracy functions like calculate_all_hla_accuracy
+# filter_by_tree <- function(df, model_list, name = "composite"){
+#   key <- model_list$full_predictions %>% 
+#     rownames_to_column("sample") %>% 
+#     separate(sample, into = c("sample", NA), sep = "_") %>% 
+#     select(sample, locus, field, .pred_class) %>% 
+#     distinct()
+#   output <- df %>% 
+#     left_join(key, by = c("sample", "locus", "field")) %>% 
+#     filter(genotyper == .pred_class) %>% 
+#     mutate(genotyper = name) %>% 
+#     select(-.pred_class)
+#   return(output)
+# }
+
+# Takes and accuracy DF an applies the tree model
+# Filters best genotypers and renames as composite
+apply_tree <- function(df, model_list, name = "Composite"){
+  # Convert to model format
+  df_model <- df %>% 
+    make_tree_input(for_fit = F) 
+  # return(df_model)
+  # Generate predictions from model
+  df_model <- df_model %>% 
+    bind_cols(
+      model_list$model %>% predict(new_data = df_model),
+      model_list$model %>% predict(new_data = df_model, type = 'prob') 
+    )
+  # Pull best prediction based on model
+  key <- df_model %>% 
     rownames_to_column("sample") %>% 
     separate(sample, into = c("sample", NA), sep = "_") %>% 
     select(sample, locus, field, .pred_class) %>% 
     distinct()
-  output <- df %>% 
+  # Filter original data based on best predictions and rename as composite
+  df <- df %>%     
     left_join(key, by = c("sample", "locus", "field")) %>% 
     filter(genotyper == .pred_class) %>% 
-    mutate(genotyper = name) %>% 
+    mutate(genotyper = name) %>%
     select(-.pred_class)
-  return(output)
+  return(df)
 }

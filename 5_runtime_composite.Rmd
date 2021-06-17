@@ -21,6 +21,7 @@ isb_path <- "/labs/khatrilab/solomonb/covid/isb"
 isb_samples <- read_tsv("/labs/khatrilab/solomonb/covid/isb/logs/210217_232725/parallel.log") %>% 
   separate(Command, into = c(NA, "sample"), sep = " ") %>% 
   pull(sample) %>% unique()
+accuracy_df <- readRDS("isb_accuracy_drb345_filtered.RDS") 
 ```
 
 
@@ -30,7 +31,7 @@ isb_samples <- read_tsv("/labs/khatrilab/solomonb/covid/isb/logs/210217_232725/p
 main_log <- sprintf("%s/logs/210217_232725", isb_path)
 hlaminer_log <- sprintf("%s/logs/210411_102218", isb_path)
 
-time_df <- expand_grid(sample = current_samples,
+time_df <- expand_grid(sample = isb_samples,
                        base_path = c(main_log, hlaminer_log)) %>% 
   mutate(log_path = sprintf("%s/%s/%s_pipeline.log", base_path,sample, sample)) %>% 
   mutate(data = map(log_path, parse_log_time)) %>% 
@@ -45,38 +46,42 @@ runtime_plt <- time_df %>%
   scale_y_sqrt()
 runtime_plt
 ```
-
-
-
-
-
 # Composite genotyper
 
-```{r}
-accuracy_df <- readRDS("isb_accuracy_drb345_filtered.RDS")
-accuracy_df
+### With PHLAT
+```{r, fig.width = 7, fig.height = 5}
+wPhlat_tree_model_list <- make_tree(accuracy_df, n_cores = 40)
+suppressWarnings(rpart.plot::rpart.plot(wPhlat_tree_model_list$model$fit))
+wPhlat_tree_model_list$auc
 ```
 
-```{r}
-composite_accuracy_df <- accuracy_df %>% 
-  filter(grepl("BL$", sample)) %>% 
-  create_composite_df(include_phlat = T, composite_name = "composite.p") %>% 
-  create_composite_df(include_phlat = F, composite_name = "composite.np")
-  
-composite_accuracy_df
+### Without PHLAT
+
+```{r, fig.width = 7, fig.height = 5}
+woPhlat_tree_model_list <- make_tree(accuracy_df, n_cores = 40, genotypers = c("arcasHLA", "optitype"))
+suppressWarnings(rpart.plot::rpart.plot(woPhlat_tree_model_list$model$fit))
+woPhlat_tree_model_list$auc
 ```
 
 
-# Heatmap of composite and single genotypers
+
+### Plot composite accuracy
+
 ```{r}
+composite_accuracy_df <- bind_rows(
+  apply_tree(accuracy_df, wPhlat_tree_model_list, name = "Composite AOP"), 
+  apply_tree(accuracy_df, woPhlat_tree_model_list, name = "Composite AO"), 
+  accuracy_df) %>% 
+  filter(grepl("-BL$", sample))
+
 composite_loci_accuracy_plt <- composite_accuracy_df %>% 
   calculate_summary_df() %>% 
   gg_summary_hla_accuracy(color_label = "Accuracy")
 composite_loci_accuracy_plt
 ```
-### Difference between composite and single genotypers
+### Plot composite difference
 ```{r}
-reference <- "composite.p"
+reference <- "Composite AOP"
 genotypers <- unique(composite_accuracy_df$genotyper)
 
 composite_loci_difference_plt <- composite_accuracy_df %>% 
@@ -85,14 +90,14 @@ composite_loci_difference_plt <- composite_accuracy_df %>%
   pivot_wider(names_from = "genotyper", values_from = "mean_accuracy") %>% 
   pivot_longer(setdiff(genotypers, reference), names_to = "genotyper", values_to = "genotyper_accuracy") %>% 
   mutate(mean_accuracy = !!sym(reference) - genotyper_accuracy) %>% 
-  gg_summary_hla_accuracy(color_label = "Composite -\nindividual\ngenotyper\naccuracy") +
+  gg_summary_hla_accuracy(color_label = "Composite AOP \naccuracy difference") +
   scale_fill_gradientn(colors = RColorBrewer::brewer.pal(11, "BrBG"), limits = c(-0.25,0.25), na.value = "transparent", oob=squish)
 composite_loci_difference_plt
 ```
 
 # Locus averaging
 
-```{r, fig.width = 7, fig.height = 3}
+```{r, fig.width = 7, fig.height = 2.5}
 averaged_composite_accuracy <- composite_accuracy_df %>% 
   locus_average_accuracy() 
 
@@ -101,7 +106,7 @@ composite_average_accuracy_plt <- averaged_composite_accuracy %>%
   gg_summary_hla_accuracy()
 composite_average_accuracy_plt
 
-reference <- "composite.p"
+reference <- "Composite AOP"
 genotypers <- unique(composite_accuracy_df$genotyper)
 
 composite_average_difference_plt <- averaged_composite_accuracy %>% 
@@ -110,7 +115,7 @@ composite_average_difference_plt <- averaged_composite_accuracy %>%
   pivot_wider(names_from = "genotyper", values_from = "mean_accuracy") %>% 
   pivot_longer(setdiff(genotypers, reference), names_to = "genotyper", values_to = "genotyper_accuracy") %>% 
   mutate(mean_accuracy = !!sym(reference) - genotyper_accuracy) %>% 
-  gg_summary_hla_accuracy(color_label = "Composite -\nindividual\ngenotyper\naccuracy") +
+  gg_summary_hla_accuracy(color_label = "Composite AOP \naccuracy difference") +
   scale_fill_gradientn(colors = RColorBrewer::brewer.pal(11, "BrBG"), limits = c(-0.25,0.25), na.value = "transparent", oob=squish)
 # composite_average_difference_plt$layers[[1]]$aes_params$colour <- "black"
 composite_average_difference_plt
@@ -148,7 +153,7 @@ plot_grid(
 )
 ```
 
-```{r, fig.width = 6, fig.height = 12}
+```{r, fig.width = 6, fig.height = 13}
 plot_grid(
   runtime_plt,
   composite_loci_accuracy_plt,
@@ -162,7 +167,3 @@ plot_grid(
 )
 ```
 
-
-
-
-# Null composite 

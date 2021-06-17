@@ -34,7 +34,8 @@ reformat_hla_genotyper <- function(genotyper_vector, reverse = F){
         "Composite" = "composite"
       ) %>% 
       fct_relevel(
-        "Composite",
+        "Composite AOP",
+        "Composite AO",
         "Ground truth",
         "arcasHLA",
         "OptiType",
