@@ -207,7 +207,8 @@ hla_mapping_stats_import <- function(samples, log_dir){
     })) %>%
     unnest(data) %>% 
     select(!(contains("data"))) %>% 
-    separate(locus, into = c(NA, "locus"), sep = "-")
+    separate(locus, into = c(NA, "locus"), sep = "-") %>% 
+    mutate_at(c("reads", "classes"), as.numeric)
 }
 # arcas_log_dir <- sprintf("%s/arcasHLA", isb_path)
 # alignment_stats_df <- hla_mapping_stats_import(isb_samples, arcas_log_dir)
@@ -228,6 +229,41 @@ parse_log_time <- function(path){
 }
 # sample_path <- "/labs/khatrilab/solomonb/covid/isb/logs/210217_232725/INCOV019-AC/INCOV019-AC_pipeline.log"
 # parse_log_time(sample_path)
+
+# Gets bp length of set of alleles via IMGTHLA reference sequences
+get_allele_length <- function(alleles, IMGTHLA_path = "/labs/khatrilab/solomonb/references/IMGTHLA"){
+  path <- sprintf("%s/hla_gen.fasta", IMGTHLA_path)
+  command_string <- sprintf("cat %s | awk '$1 ~ /^>/ {print}'", path)
+  tibble(header = system(command_string, intern = T)) %>% 
+    separate(header, into = c("id", "allele", "bp"), sep = " ", extra = "drop") %>% 
+    filter(allele %in% alleles) %>% 
+    separate(allele, into = "locus", sep = "\\*", extra = "drop") %>% 
+    select(-id) %>% 
+    mutate_at(c("bp"), as.numeric)
+}
+# get_allele_length(c("B*07:02:01:01"))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # Basic scHLAcount count matrix import
 scHLA_import <- function(sample, result_path, label_path, barcode_path){

@@ -343,3 +343,88 @@ gg_hla_prediction_frequency <- function(df, loci = NULL, color = "viridis", reve
           strip.background.x = element_blank())
 }
 
+
+# Removes invalid locus:field:genotyper combinations from an accuracy data frame
+# Makes assumption that accuracy = 0 for every occurence if the combination is invalid (shortcut)
+remove_invalid_combinations <- function(df){
+  df %>% 
+    group_by(genotyper, locus, field) %>% 
+    mutate(total_accuracy = sum(accuracy, na.rm = T)) %>% 
+    filter(total_accuracy !=0) %>% 
+    select(-total_accuracy)
+}
+
+# Plots accuracy metrics vs coverage metrics
+# Expects and accuracy data frame
+gg_coverage <- function(df, 
+                        x_var = "coverage", 
+                        y_var = "accuracy",
+                        field_var = "field_2",
+                        x_log = T, 
+                        facet_genotyper = F){
+  # Input checks
+  arg_col <- makeAssertCollection()
+  assertChoice(y_var, c("accuracy", "success", "n_alleles"), add = arg_col)
+  assertChoice(x_var, c("reads", "coverage", "n_cells"), add = arg_col)
+  assertChoice(field_var, c("field_1", "field_2", "field_3"), add = arg_col)
+  assertLogical(x_log, add = arg_col)
+  assertLogical(facet_genotyper, add = arg_col)
+  if (arg_col$isEmpty()==F) {map(arg_col$getMessages(),print);reportAssertions(arg_col)}
+  
+  # Adjust input data
+  df <- df %>% 
+    filter(field == field_var) %>% # Limit to only one field
+    mutate(genotyper = reformat_hla_genotyper(genotyper)) %>% # Reformat genotyper names
+    filter_at(y_var, function(x) !is.na(x))
+  ## Remove genotypers not valid for a given genotyper:locus:field combo
+  if (y_var=="accuracy"){
+    df <- remove_invalid_combinations(df)}
+  
+  # Set some constants
+  y_max = max(df[[y_var]], na.rm = T)
+  y_scale_factor = y_max*0.05
+  x_lab <- case_when(x_var == "reads" ~ "Reads",
+                     x_var == "coverage" ~ "Coverage",
+                     x_var == "n_cells" ~ "Number of cells")
+  y_lab <- case_when(y_var == "accuracy" ~ "Accuracy",
+                     y_var == "success" ~ "Success",
+                     y_var == "n_alleles" ~ "Number of alleles")
+  
+  # Set the base layer
+  if (x_log == T){
+    base_layer <- ggplot(df, aes(x = log10(!!sym(x_var)), y = !!sym(y_var), color = genotyper))
+    x_lab <- bquote(log[10]*.(sprintf("(%s)",x_lab)))}  # Updates the x_lab to include formatted log string
+  else {
+    base_layer <- ggplot(df, aes(x = !!sym(x_var), y = !!sym(y_var), color = genotyper))}
+  
+  # Facet layer that switched based on whether to include genotyper as a facet
+  facet_layer <- ifelse(facet_genotyper == T,
+                        list(facet_grid(genotyper~locus, scales = "free_x")),
+                        list(facet_grid(.~locus, scales = "free_x")))
+  
+  # Determine how to plot points based on y_var
+  if (y_var %in% c("accuracy", "success")){
+    # Create a supplemental DF that translates accuracy slightly based on genotyper
+    filter_df <- df %>% 
+      mutate(grouper = genotyper) %>% group_by(grouper) %>% nest() %>% ungroup() %>% 
+      mutate(nudge_factor = c(0.025, 0, -0.025)) %>% 
+      mutate(data = map2(data, nudge_factor, function(df,n) df %>% mutate_at(y_var, ~!!sym(y_var)+n))) %>% 
+      unnest(data)
+    point_layer <- list(geom_jitter(data = filter_df, size=0.2,alpha=0.5,height = 0.01))} 
+  if (y_var == "n_alleles"){
+    point_layer <- list(geom_jitter(size = 5*y_scale_factor, color = "black", width = 0, height = y_scale_factor, alpha = 0.5))}
+  
+  # Assemble full plot
+  base_layer + 
+    point_layer +
+    geom_smooth(method = "lm")+
+    theme_bw() +
+    facet_layer+
+    coord_cartesian(ylim = c(-0.1,y_max))+
+    scale_y_continuous(n.breaks = 6)+
+    labs(y = y_lab, x = x_lab, color = "Genotyper")+
+    theme(panel.spacing = unit(0.1,"line"),
+          axis.text.x = element_text(angle = 45, hjust = 1)) +
+    guides(color=guide_legend(override.aes=list(fill=NA, size=5))) +
+    scale_color_brewer(palette = "Dark2")
+}

@@ -5,7 +5,6 @@ output: html_notebook
 
 # TO DO
 
-### ADDITIONAL COMPOSITE W/O PHLAT
 ### BETTER FULL PLOT LAYOUT
 
 # Setup
@@ -90,8 +89,10 @@ composite_loci_difference_plt <- composite_accuracy_df %>%
   pivot_wider(names_from = "genotyper", values_from = "mean_accuracy") %>% 
   pivot_longer(setdiff(genotypers, reference), names_to = "genotyper", values_to = "genotyper_accuracy") %>% 
   mutate(mean_accuracy = !!sym(reference) - genotyper_accuracy) %>% 
+  drop_na() %>% 
   gg_summary_hla_accuracy(color_label = "Composite AOP \naccuracy difference") +
-  scale_fill_gradientn(colors = RColorBrewer::brewer.pal(11, "BrBG"), limits = c(-0.25,0.25), na.value = "transparent", oob=squish)
+  scale_fill_gradientn(colors = RColorBrewer::brewer.pal(11, "BrBG"), limits = c(-0.55,0.55), oob=squish)
+composite_loci_difference_plt$layers[[1]]$aes_params$colour <- "black"
 composite_loci_difference_plt
 ```
 
@@ -115,9 +116,10 @@ composite_average_difference_plt <- averaged_composite_accuracy %>%
   pivot_wider(names_from = "genotyper", values_from = "mean_accuracy") %>% 
   pivot_longer(setdiff(genotypers, reference), names_to = "genotyper", values_to = "genotyper_accuracy") %>% 
   mutate(mean_accuracy = !!sym(reference) - genotyper_accuracy) %>% 
+  drop_na() %>% 
   gg_summary_hla_accuracy(color_label = "Composite AOP \naccuracy difference") +
-  scale_fill_gradientn(colors = RColorBrewer::brewer.pal(11, "BrBG"), limits = c(-0.25,0.25), na.value = "transparent", oob=squish)
-# composite_average_difference_plt$layers[[1]]$aes_params$colour <- "black"
+  scale_fill_gradientn(colors = RColorBrewer::brewer.pal(11, "BrBG"), limits = c(-0.55,0.55), oob=squish)
+composite_average_difference_plt$layers[[1]]$aes_params$colour <- "black"
 composite_average_difference_plt
 ```
 # Combined plots
@@ -163,7 +165,35 @@ plot_grid(
   ncol = 1,
   align = "v",
   axis = "lr",
-  rel_heights = c(1,1,1,0.6,0.6)
+  rel_heights = c(1,1,1,0.6,0.6),
+  labels = LETTERS[1:5]
 )
 ```
+
+# Tables
+
+```{r}
+composite_accuracy_df %>% 
+  calculate_summary_df() %>% 
+  flex_summary_hla_accuracy() %>%
+  fontsize(size = 8, part = "all") %>%
+  print(preview = "pptx")
+```
+
+```{r}
+averaged_composite_accuracy %>% 
+  calculate_summary_df() %>% 
+  flex_summary_hla_accuracy() %>%
+  fontsize(size = 8, part = "all") %>%
+  print(preview = "pptx")
+```
+
+
+
+
+
+
+
+
+
 

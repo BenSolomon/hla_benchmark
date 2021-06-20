@@ -1,384 +1,308 @@
 ---
 title: "3) Coverage Analysis"
-output: html_notebook
+output: 
+  html_notebook:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    code_folding: hide
 ---
-# TO DO
-### CHECK PREDICTION IMPORT FUNCTIONS ACCURATE FOR SUBSAMPLE
-### CHECK LABELING OF OBJECTS FOR READ VS. CELL COVERAGE
-### MOVE STABLE HELPERS TO HELPER SCRIPTS
-### CONSISTENT ORIGINAL VS. SUBSAMPLE WORKFLOW
 
 
 # Startup 
-```{r}
+
+```{r, message = F}
 library(tidyverse)
 library(cowplot)
+library(ggpmisc)
+
 source("data_import_functions.R")
-source("accuracy_functions.R")
+source("calculation_functions.R")
+source("figure_format_functions.R")
+all_hla_expanded <- readRDS("all_hla_expanded.RDS")
 isb_path <- "/labs/khatrilab/solomonb/covid/isb"
-isb_samples <- read_tsv("/labs/khatrilab/solomonb/covid/isb/logs/210217_232725/parallel.log") %>%
-  separate(Command, into = c(NA, "sample"), sep = " ") %>%
+isb_samples <- read_tsv("/labs/khatrilab/solomonb/covid/isb/logs/210217_232725/parallel.log") %>% 
+  separate(Command, into = c(NA, "sample"), sep = " ") %>% 
   pull(sample) %>% unique()
 ```
+
+### Get reference alleles
+
 - GCh38 reference alleles (per https://www.ebi.ac.uk/ipd/imgt/hla/help/genomics.html)
-
-### Reference alleles
 - To be used to calculate coverage
-```{r}
-reference_alleles <- c(
-  "A*03:01:01:01",
-  "B*07:02:01:01",
-  "C*07:02:01:01",
-  "DMA*01:01:01:01",
-  "DMB*01:03:01:01",
-  "DOA*01:01:02:01",
-  "DOB*01:01:01:01",
-  "DPA1*01:03:01:01",
-  "DPB1*04:01:01:01",
-  "DPB2*03:01:01:01",
-  "DQA1*01:02:01:01",
-  "DQB1*06:02:01:01",
-  "DRA*01:02:03",
-  "DRB1*15:03:01:01",
-  "DRB3*02:02:01:01",
-  "DRB4*01:03:01:01",
-  "DRB5*01:01:01:01",
-  "DRB7*01:01:01",
-  "E*01:03:02:01",
-  "F*01:03:01:01",
-  "H*02:04",
-  "HFE*001:01:01",
-  "K*01:02",
-  "L*01:01:01:01",
-  "T*01:01:01:01",
-  "V*01:01:01:01"
-  )
+
+```{r, message = F}
+reference_alleles <- read_tsv("GCh38_reference_alleles.txt", col_names = F) %>% pull(1)
+genome_region_reference <- get_allele_length(reference_alleles)
 ```
 
-### Calculating reference allele length
-```{r}
-#BASED ON GCHR38 REFERENCE ALLELES
-genome_region_reference <- tibble(header = system("cat /labs/khatrilab/solomonb/references/IMGTHLA/hla_gen.fasta | 
-                        awk '$1 ~ /^>/ {print}'", intern = T)) %>% 
-    separate(header, into = c("id", "allele", "bp"), sep = " ", extra = "drop") %>% 
-  filter(allele %in% reference_alleles) %>% 
-  separate(allele, into = "locus", sep = "\\*", extra = "drop") %>% 
-  select(-id) %>% 
-  {. ->> hla_loci_length_df;.} %>% 
-  pull(bp) %>% as.numeric() %>% sum()
+### Get arcasHLA alignment stats
 
+```{r}
+arcas_log_dir <- sprintf("%s/arcasHLA", isb_path)
+alignment_stats_df <- hla_mapping_stats_import(isb_samples, arcas_log_dir)
 ```
 
-### Function to import arcas logs
+### Import cell counts
+
 ```{r}
-### Compare to hla_mapping_stats function?
-parse_arcas_log <- function(path){
-  if (!file.exists(path)){return(NA)}
-  
-  df <- tibble(lines = read_lines(path)) 
-  if (any(grepl("error", df$lines, ignore.case = T))){return(NA)}
-  
-  all_read_stats <- df %>% 
-    mutate(lines = gsub("\t", "", lines)) %>% 
-    filter(grepl("^\\[alignment\\] Processed", lines))  %>% 
-    mutate(lines = gsub("[A-Za-z]|\\[|\\]","", lines)) %>% 
-    separate(lines, into = c("all_reads_extracted", "all_reads_mapped"), sep = ", ") %>% 
-    mutate_all(as.numeric) %>% 
-    mutate(proportion_reads_mapped = all_reads_mapped/all_reads_extracted)
-    
-  df%>% 
-    mutate(lines = gsub("\t", "", lines)) %>% 
-    filter(grepl("^HLA", lines)) %>% 
-    separate(lines, into = c("locus", "locus_abundance", "locus_reads", "locus_classes"), sep = " +") %>% 
-    mutate(locus_abundance = as.numeric(gsub("%","",locus_abundance))/100) %>% 
-    mutate_at(vars(c(locus_reads, locus_classes)), as.numeric) %>% 
-    bind_cols(all_read_stats)
-}
-
-
-log_path <- sprintf("%s/logs/210309_155222/%s/%s_arcas_genotype.log",isb_path,"INCOV006-BL","INCOV006-BL")
-
-parse_arcas_log(log_path)
+cell_counts_df <- readRDS("isb_sequenced_cell_count.RDS")
 ```
-### ggplot layer for offset points
+
+### Assemble accuracy DF
+
 ```{r}
-add_points <- list(
-  geom_jitter(data = . %>% filter(genotyper == "arcasHLA") %>% mutate(accuracy=accuracy+0.025),
-              size=0.2,alpha=0.2,height = 0.01),
-  geom_jitter(data = . %>% filter(genotyper == "optitype") %>% mutate(accuracy=accuracy),
-              size=0.2,alpha=0.2,height = 0.01),
-  geom_jitter(data = . %>% filter(genotyper == "phlat") %>% mutate(accuracy=accuracy-0.025),
-              size=0.2,alpha=0.2,height = 0.01)
+accuracy_df <- readRDS("isb_accuracy_drb345_filtered.RDS")
+accuracy_df <- accuracy_df %>% 
+  left_join(
+    success_df %>% select(sample:field, genotyper, success = accuracy),
+    by = c("sample", "locus", "field", "genotyper")
+  )%>% 
+  left_join(alignment_stats_df, by = c("sample", "locus")) %>% 
+  left_join(hla_loci_length_df, by = "locus") %>%
+  left_join(cell_counts_df, by = "sample") %>%
+  mutate_at(vars(c(reads, bp)), as.numeric) %>% 
+  mutate(coverage = (reads * 91)/bp) %>% 
+  mutate(n_alleles = map_dbl(allele, function(x) sum(!is.na(x)))) %>% 
+  filter(grepl("^[ABC]|D.[AB]1", locus) & grepl("-(AC|BL)$", sample) & genotyper != "hlaminer") 
+```
+
+
+### Coverage based plots
+
+```{r, fig.width=12, fig.height=2.5, warning = F, message = F}
+gg_coverage(accuracy_df, x_var = "coverage", y_var = "accuracy") 
+```
+```{r, fig.width=12, fig.height=2.5, warning = F, message = F}
+gg_coverage(accuracy_df, x_var = "coverage", y_var = "success")
+```
+```{r, fig.width=12, fig.height=3, warning = F, message = F}
+gg_coverage(accuracy_df, x_var = "coverage", y_var = "n_alleles", facet_genotyper = T)
+```
+
+### Cell number based plots
+
+```{r, fig.width=12, fig.height=2.5, warning = F, message = F}
+gg_coverage(accuracy_df, x_var = "n_cells", y_var = "accuracy") 
+```
+```{r, fig.width=12, fig.height=2.5, warning = F, message = F}
+gg_coverage(accuracy_df, x_var = "n_cells", y_var = "success")
+```
+```{r, fig.width=12, fig.height=3, warning = F, message = F}
+gg_coverage(accuracy_df, x_var = "n_cells", y_var = "n_alleles", facet_genotyper = T)
+```
+
+
+# Subsample READS
+
+### Import read subsample data
+
+```{r}
+# Import predicted genotypes
+subsample_reads_path <- "/labs/khatrilab/solomonb/covid/isb/subsample"
+subsample_reads_samples <- tibble(sample = list.files(sprintf("%s/arcasHLA", subsample_reads_path))) %>% 
+  filter(grepl("^INCOV", sample)) %>% 
+  separate(sample, into = c("sample"), sep = "\\.", extra = "drop") %>% 
+  distinct() %>% 
+  pull(sample)
+subsample_reads_df <- format_hla_table(combine_HLA_import(path = subsample_reads_path, samples = subsample_reads_samples))
+subsample_reads_df <- subsample_reads_df %>% 
+  filter(grepl("^[ABC]|D.[AB]1", locus) & grepl("-(AC|BL)_", sample))
+subsample_reads_df
+```
+
+```{r, message = F}
+# Expand invitro genotypes across read subsample names
+invitro_df <- invitro_import()
+invitro_reads_df <- subsample_reads_df %>% 
+  select(sample) %>% 
+  distinct() %>% 
+  separate(sample, into = c("sample", "subsample"), sep = "_") %>% 
+  left_join(invitro_df, by = "sample") %>% 
+  unite(sample, sample, subsample, sep = "_") %>% 
+  format_hla_table() %>% 
+  drop_na()
+invitro_reads_df
+```
+
+```{r}
+# Import read statistics
+subsample_reads_arcas_log_dir <- sprintf("%s/arcasHLA", subsample_reads_path)
+subsample_reads_alignment_stats_df <- hla_mapping_stats_import(subsample_reads_samples, subsample_reads_arcas_log_dir)
+```
+
+### Calculate accuracy
+
+```{r}
+# Calculate accuracy
+subsample_reads_accuracy_df <- compare_hla(
+  hla_df = bind_rows(
+    subsample_reads_df,
+    invitro_reads_df
+  ),
+  reference = "invitro", 
+  method = "accuracy"
 )
-```
-
-### ggplot layer for p-value annotation
-```{r}
-annotate_model <- list(
-  stat_fit_glance(method = "lm",
-                  label.x = "right",
-                  label.y = c(0.25,0.2,0.15),
-                  aes(label = paste("italic(p)*\" = \"*", 
-                                    signif(stat(p.value), digits = 2),
-                                    sep = ""),
-                      fill = genotyper),
-                  parse = T,
-                  # alpha = 0.33,
-                  # geom = "label",
-                  # color = "black",
-                  size = 4
-  ))
-```
-### Calculate accuracy as in 1_accuracy.Rmd
-
-```{r,message = F, warning=F}
-invitro_hla <- format_hla_table(invitro_import("/labs/khatrilab/solomonb/hla_project/hla_benchmark/hla_2020-10-23_1457.tsv"))
-all_hla <- format_hla_table(combine_HLA_import(path = isb_path, samples = isb_samples, expand_invitro = T))
-accuracy_df <- compare_hla(hla_df = all_hla, 
-            reference = "invitro", 
-            exclude_missing = F, 
-            compare_function = "accuracy") 
-```
-
-# Import arcas logs
-```{r}
-alignment_stats <- tibble(sample = isb_samples) %>% 
-  mutate(data = map(sample, function(x){
-    log_path <- sprintf("%s/logs/210309_155222/%s/%s_arcas_genotype.log",isb_path,x,x)
-    parse_arcas_log(log_path)
-  })) %>%
-  unnest(data) %>% 
-  select(-data) %>% 
-  separate(locus, into = c(NA, "locus"), sep = "-")
-```
-
-# Original analysis
-
-### Calculate and plot read coverage
-```{r}
-read_length <- 91
-coverage_full_plot <- accuracy_df %>% 
-  left_join(alignment_stats, by = c("sample", "locus")) %>% 
-  left_join(hla_loci_length_df, by = "locus") %>%
-  mutate_at(vars(c(locus_reads, bp)), as.numeric) %>% 
-  mutate(coverage = (locus_reads * 91)/bp) %>% 
-  filter(grepl("^[ABC]", locus) & grepl("-(AC|BL)$", sample) & field == "field_2" & genotyper != "hlaminer") %>% 
-  ggplot(aes(x = log10(coverage), y = accuracy, color = genotyper))+
-  geom_smooth(method = "lm")+
-  theme_bw() +
-  facet_grid(.~locus, scales = "free_x") +
-  coord_cartesian(ylim = c(0,1))+
-  scale_y_continuous(n.breaks = 6)+
-  labs(y = "Accuracy", x = expression("log"[10]*"(Coverage)"))+
-  theme(panel.spacing = unit(0.1,"line")) +
-  scale_color_brewer(palette = "Dark2")
-
-coverage_full_plot
-```
-### Keys to link samples to number of cells ine ach
-```{r}
-# Based on barcodes used
-cell_key <- readRDS("/labs/khatrilab/solomonb/covid/isb/demultiplexing_barcode_reference.rds") %>% 
-  select("sample" = sample_id, all_barcodes) %>% 
-  unnest(all_barcodes) %>% 
-  count(sample, name = "n_cells")
+# saveRDS(subsample_reads_accuracy_df, "isb_subsample_reads_accuracy.RDS")
 ```
 
 
 ```{r}
-# Based on barcodes extracted from fastq
-cell_key <- tibble(line = system("wc -l ~/solomonb/covid/isb/extracted_barcodes/INCOV*", intern = T)) %>% 
-  separate(line, into = c("n_cells", "file"), sep = " /") %>% 
-  drop_na() %>% 
-  mutate(sample = gsub("\\..*","",basename(file))) %>% 
-  select(-file)
+# Calculate success
+subsample_reads_success_df <- compare_hla(
+  hla_df = bind_rows(
+    subsample_reads_df,
+    invitro_reads_df
+  ),
+  reference = "invitro", 
+  method = "success"
+)
+# saveRDS(subsample_reads_success_df, "isb_subsample_reads_success.RDS")
 ```
-### Calculate and plot cell number coverage
+
 ```{r}
-read_length <- 91
-cells_full_plot <- accuracy_df %>% 
-  left_join(alignment_stats, by = c("sample", "locus")) %>% 
-  left_join(hla_loci_length_df, by = "locus") %>%
-  left_join(cell_key, by = "sample") %>%
-  mutate_at(vars(c(locus_reads, bp, n_cells)), as.numeric) %>% 
-  mutate(coverage = (locus_reads * 91)/bp) %>% 
-  filter(grepl("^[ABC]", locus) & grepl("-(AC|BL)$", sample) & field == "field_2" & genotyper != "hlaminer") %>% 
-  ggplot(aes(x = log10(n_cells), y = accuracy, color = genotyper))+
-  geom_smooth(method = "lm")+
-  theme_bw() +
-  facet_grid(.~locus, scales = "free_x") +
-  coord_cartesian(ylim = c(0,1))+
-  scale_y_continuous(n.breaks = 6)+
-  labs(y = "Accuracy", x = expression("log"[10]*"(Cell number)"))+
-  theme(panel.spacing = unit(0.1,"line")) +
-  scale_color_brewer(palette = "Dark2")
-
-cells_full_plot
+# Combine various data
+subsample_reads_combined_df <- subsample_reads_accuracy_df %>% 
+  left_join(
+    subsample_reads_success_df %>% select(sample:field, genotyper, success = accuracy),
+    by = c("sample", "locus", "field", "genotyper")
+  )%>% 
+  left_join(subsample_reads_alignment_stats_df, by = c("sample", "locus")) %>% 
+  left_join(genome_region_reference, by = "locus") %>%
+  bind_rows(accuracy_df %>% select(-n_cells)) %>% # No cell numbers for read subsamples
+  mutate_at(vars(c(reads, bp)), as.numeric) %>% 
+  mutate(coverage = (reads * 91)/bp) %>%  # Calculate coverage
+  mutate(n_alleles = map_dbl(allele, function(x) sum(!is.na(x)))) %>%  # Calculate n_alleles
+  filter(grepl("^[ABC]|D.[AB]1", locus) & grepl("-(AC|BL)", sample) & genotyper != "hlaminer") 
 ```
-### Composite full sample plot
-```{r, fig.width = 10, fig.height = 4}
-full_plot <- plot_grid(
-  coverage_full_plot + add_points + annotate_model + theme(legend.position="none"), 
-  cells_full_plot + add_points + annotate_model +theme(legend.position="none",
-           axis.title.y = element_blank(), 
-           axis.text.y = element_blank()), 
-  nrow = 1)
-full_legend <- get_legend(coverage_full_plot + guides(color = guide_legend(ncol = 1)) + theme(legend.position = "right"))
-plot_grid(full_plot, full_legend, nrow = 1, rel_widths = c(0.85, .15))
+
+### Coverage plots
+```{r, fig.width=12, fig.height=2.5, warning = F, message = F}
+gg_coverage(subsample_reads_combined_df, x_var = "coverage", y_var = "accuracy") 
+```
+```{r, fig.width=12, fig.height=2.5, warning = F, message = F}
+gg_coverage(subsample_reads_combined_df, x_var = "coverage", y_var = "success")
+```
+```{r, fig.width=12, fig.height=4, warning = F, message = F}
+gg_coverage(subsample_reads_combined_df, x_var = "coverage", y_var = "n_alleles", facet_genotyper = T)
 ```
 
 
+# Subsample CELLS
 
-# Subsample analysis
-
-### Import read subsample predictions
 ```{r}
-path <- "/labs/khatrilab/solomonb/covid/isb/subsample"
-samples <- list.dirs(sprintf("%s/logs/210408_151443", path), recursive = F, full.names = F)
-hla_df <- format_hla_table(combine_HLA_import(path = path, samples = samples))
-hla_df
+# Import predicted genotypes
+subsample_cells_path <- "/labs/khatrilab/solomonb/covid/isb/subsample_cells"
+subsample_cells_samples <- tibble(sample = list.files(sprintf("%s/arcasHLA", subsample_cells_path))) %>% 
+  filter(grepl("^INCOV", sample)) %>% 
+  separate(sample, into = c("sample"), sep = "\\.", extra = "drop") %>% 
+  distinct() %>% 
+  pull(sample)
+subsample_cells_df <- format_hla_table(combine_HLA_import(path = subsample_cells_path, samples = subsample_cells_samples))
+subsample_cells_df <- subsample_cells_df %>% 
+  filter(grepl("^[ABC]|D.[AB]1", locus) & grepl("-(AC|BL)_", sample))
+subsample_cells_df
 ```
-### Calculate read subsample accuracy 
+
+
+```{r, message = F}
+# Expand invitro genotypes across read subsample names
+invitro_df <- invitro_import()
+invitro_cells_df <- subsample_cells_df %>% 
+  select(sample) %>% 
+  distinct() %>% 
+  separate(sample, into = c("sample", "subsample"), sep = "_") %>% 
+  left_join(invitro_df, by = "sample") %>% 
+  unite(sample, sample, subsample, sep = "_") %>% 
+  format_hla_table() %>% 
+  drop_na()
+invitro_cells_df
+```
+
 ```{r}
-read_subsample_df <- hla_df %>% 
-  filter(genotyper != "invitro") %>% 
-  bind_rows(
-    expand_grid(sample = unique(invitro_hla$sample), subset = c("S01","S001","S0001")) %>% 
-      left_join(invitro_hla, by = "sample") %>% 
-      unite("sample", sample, subset, sep = "_")
-  ) %>% 
-  separate(sample, into = c("group"), sep = "_", extra = "drop", remove = F) %>% 
-  filter(group %in% samples) %>% 
-  select(-group) %>% 
-  compare_hla(reference = "invitro", exclude_missing = F, compare_function = "accuracy")
+# Import read statistics
+subsample_cells_arcas_log_dir <- sprintf("%s/arcasHLA", subsample_cells_path)
+subsample_cells_alignment_stats_df <- hla_mapping_stats_import(subsample_cells_samples, subsample_cells_arcas_log_dir)
 ```
 
-### Import read subsample arcas logs
 ```{r}
-hla_stats <- expand_grid(sample = samples, subset = c("S01", "S001", "S0001")) %>% 
-  mutate(filepath = sprintf("%s/logs/210408_151443/%s/%s_%s_arcas_genotype.log", path, sample, sample, subset)) %>% 
-  mutate(data = map(filepath, function(x){
-    parse_arcas_log(x)
-  })) %>% 
-  unnest(data)
-
-all_stats <- hla_stats %>% 
-  bind_rows(alignment_stats %>% mutate(subset = "S1")) %>% 
-  mutate(locus = gsub("HLA-", "", locus))
-```
-
-
-### Calculate and plot read subsample coverage
-```{r, fig.width = 10, fig.height = 3}
-read_subsample_plot <- read_subsample_df %>% 
-  separate(sample, into = c("sample", "subset"), sep = "_") %>% 
-  bind_rows(accuracy_df %>% mutate(subset = "S1")) %>% 
-  filter(grepl("^[ABC]", locus) & grepl("-(AC|BL)$", sample) & field == "field_2" & genotyper != "hlaminer") %>% 
-  left_join(all_stats, by = c("sample", "subset", "locus")) %>% 
-  left_join(hla_loci_length_df, by = "locus") %>%
-  mutate(coverage = (locus_reads * 91)/as.numeric(bp)) %>% 
-  ggplot(aes(x = log10(coverage), y = accuracy, color = genotyper))+
-  geom_smooth(method = "lm")+
-  theme_bw() +
-  facet_grid(.~locus, scales = "free_x") +
-  coord_cartesian(ylim = c(0,1))+
-  scale_y_continuous(n.breaks = 6)+
-  labs(y = "Accuracy", x = expression("log"[10]*"(Coverage)"))+
-  # theme(axis.text.x = element_text(angle = 90))+
-  theme(panel.spacing = unit(0.1,"line")) +
-  scale_color_brewer(palette = "Dark2")
-read_subsample_plot
-```
-
-### Import and calculate cell subsample accuracy
-
-```{r, message=F}
-combine_HLA_import <- function(path, samples){
-  arcas <- arcas_import(path = sprintf("%s/arcasHLA", path))
-  phlat <- expand_grid(group = samples, subset = c("C01", "C001", "C0005")) %>% 
-    mutate(sample = paste(group, subset, sep = "_")) %>% 
-    select(sample) %>% 
-    mutate(data = map(sample, function(x) {
-      phlat_import(path = sprintf("%s/phlat", path), sample = x)
-    })) %>% 
-    unnest(data)
-  opti <- expand_grid(group = samples, subset = c("C01", "C001", "C0005")) %>% 
-    mutate(sample = paste(group, subset, sep = "_")) %>% 
-    select(sample) %>% 
-    mutate(data = map(sample, function(x) {
-      optitype_import(path = sprintf("%s/optitype", path), sample = x)
-    })) %>% 
-    unnest(data)
-  opti
-  bind_rows(arcas, phlat, opti) %>% 
-    drop_na()
-}
-
-path <- "/labs/khatrilab/solomonb/covid/isb/subsample_cells"
-samples <- list.dirs(sprintf("%s/logs/210410_181059", path), recursive = F, full.names = F)
-hla_df <- format_hla_table(combine_HLA_import(path = path, samples = samples))
-
-cell_subsample_df <- hla_df %>% 
-  bind_rows(
-    expand_grid(sample = unique(invitro_hla$sample), subset = c("C01","C001","C0005")) %>% 
-      left_join(invitro_hla, by = "sample") %>% 
-      unite("sample", sample, subset, sep = "_")
-  ) %>% 
-  separate(sample, into = c("group"), sep = "_", extra = "drop", remove = F) %>% 
-  filter(group %in% samples) %>% 
-  select(-group) %>% 
-  compare_hla(reference = "invitro", exclude_missing = F, compare_function = "accuracy")
-```
-
-### Cell subsample key 
-```{r}
-subsample_cell_key <- tibble(line = system("wc -l ~/solomonb/covid/isb/subsample_cells/barcodes/INCOV*", intern = T)) %>% 
+# Import cell counts for each subsample
+subsample_cell_counts_df <- tibble(line = system("wc -l /labs/khatrilab/solomonb/covid/isb/subsample_cells/barcodes/INCOV*", intern = T)) %>% 
   separate(line, into = c("n_cells", "file"), sep = " /") %>% 
   drop_na() %>% 
   mutate(sample = gsub("\\..*","",basename(file))) %>% 
   select(-file) %>% 
   separate(sample, into = c("sample", "subset"), sep = "_")
-```
-### Full cell key with C1 annotation
-```{r}
-cell_key <- tibble(line = system("wc -l ~/solomonb/covid/isb/extracted_barcodes/INCOV*", intern = T)) %>% 
-  separate(line, into = c("n_cells", "file"), sep = " /") %>% 
-  drop_na() %>% 
-  mutate(sample = gsub("\\..*","",basename(file))) %>% 
-  select(-file) %>% 
-  mutate(subset = "C1")
-```
-### Calculate and plot cell subsample coverage
-```{r, fig.width = 10, fig.height = 3}
-cells_subsample_plot <- cell_subsample_df %>% 
-  separate(sample, into = c("sample", "subset"), sep = "_") %>% 
-  bind_rows(accuracy_df %>% mutate(subset = "C1")) %>% 
-  filter(grepl("^[ABC]", locus) & grepl("-(AC|BL)$", sample) & field == "field_2" & genotyper != "hlaminer") %>% 
-  left_join(bind_rows(cell_key, subsample_cell_key), by = c("sample", "subset")) %>% 
-  mutate(n_cells = as.numeric(n_cells)) %>% 
-  ggplot(aes(x = log10(n_cells), y = accuracy, color = genotyper))+
-  # geom_point(size = 0.5, alpha = 0.5)+
-  geom_smooth(method = "lm")+
-  theme_bw() +
-  facet_grid(.~locus, scales = "free_x") +
-  coord_cartesian(ylim = c(0,1))+
-  scale_y_continuous(n.breaks = 6)+
-  labs(y = "Accuracy", x = expression("log"[10]*"(Cells)"))+
-  # theme(axis.text.x = element_text(angle = 90))+
-  theme(panel.spacing = unit(0.1,"line")) +
-  scale_color_brewer(palette = "Dark2")
-cells_subsample_plot
+subsample_cell_counts_df
 ```
 
-### Composite subsample plot
-```{r, fig.width = 10, fig.height = 4}
-subsample_plot <- plot_grid(
-  read_subsample_plot + add_points + annotate_model + theme(legend.position="none"), 
-  cells_subsample_plot + add_points + annotate_model +theme(legend.position="none",
-           axis.title.y = element_blank(), 
-           axis.text.y = element_blank()), 
-  nrow = 1)
-subsample_legend <- get_legend(coverage_full_plot + guides(color = guide_legend(ncol = 1)) + theme(legend.position = "right"))
-plot_grid(subsample_plot, subsample_legend, nrow = 1, rel_widths = c(0.85, .15))
+### Calculate accuracy
+
+```{r}
+# Calculate accuracy
+subsample_cells_accuracy_df <- compare_hla(
+  hla_df = bind_rows(
+    subsample_cells_df,
+    invitro_cells_df
+  ),
+  reference = "invitro", 
+  method = "accuracy"
+)
+# saveRDS(subsample_cells_accuracy_df, "isb_subsample_cells_accuracy.RDS")
 ```
+
+```{r}
+# Calculate success
+subsample_cells_success_df <- compare_hla(
+  hla_df = bind_rows(
+    subsample_cells_df,
+    invitro_cells_df
+  ),
+  reference = "invitro", 
+  method = "success"
+)
+# saveRDS(subsample_cells_success_df, "isb_subsample_cells_success.RDS")
+```
+
+```{r}
+# Combine various data
+subsample_cells_combined_df <- subsample_cells_accuracy_df %>% 
+  left_join(
+    subsample_cells_success_df %>% select(sample:field, genotyper, success = accuracy),
+    by = c("sample", "locus", "field", "genotyper")
+  )%>% 
+  left_join(subsample_cells_alignment_stats_df, by = c("sample", "locus")) %>% 
+  left_join(genome_region_reference, by = "locus") %>%
+  left_join(cell_counts_df, by = "sample") %>%
+  bind_rows(accuracy_df) %>% 
+  mutate_at(vars(c(reads, bp)), as.numeric) %>% 
+  mutate(coverage = (reads * 91)/bp) %>% 
+  mutate(n_alleles = map_dbl(allele, function(x) sum(!is.na(x)))) %>% 
+  filter(grepl("^[ABC]|D.[AB]1", locus) & grepl("-(AC|BL)", sample) & genotyper != "hlaminer") 
+```
+
+### Coverage plots
+
+```{r, fig.width=12, fig.height=2.5, warning = F, message = F}
+gg_coverage(subsample_cells_combined_df, x_var = "coverage", y_var = "accuracy") 
+```
+```{r, fig.width=12, fig.height=2.5, warning = F, message = F}
+gg_coverage(subsample_cells_combined_df, x_var = "coverage", y_var = "success")
+```
+```{r, fig.width=12, fig.height=3, warning = F, message = F}
+gg_coverage(subsample_cells_combined_df, x_var = "coverage", y_var = "n_alleles", facet_genotyper = T)
+```
+
+### Cell number plots
+
+```{r, fig.width=12, fig.height=2.5, warning = F, message = F}
+gg_coverage(subsample_cells_combined_df, x_var = "n_cells", y_var = "accuracy") 
+```
+```{r, fig.width=12, fig.height=2.5, warning = F, message = F}
+gg_coverage(subsample_cells_combined_df, x_var = "n_cells", y_var = "success") 
+```
+```{r, fig.width=12, fig.height=3, warning = F, message = F}
+gg_coverage(subsample_cells_combined_df, x_var = "n_cells", y_var = "n_alleles", facet_genotyper = T)
+```
+
 
