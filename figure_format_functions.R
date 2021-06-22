@@ -312,38 +312,6 @@ gg_runtime <- function(df, include_tasks = NULL){
   return(plt)
 }
 
-
-
-
-
-
-### OLD WORK
-
-### Replaced by gg_hla_predicition_tally
-### Older version that plotted allele frequency rather than count
-gg_hla_prediction_frequency <- function(df, loci = NULL, color = "viridis", reverse = F){
-  if (is.null(loci)){
-    loci <- c("A","B","C","DPA1","DPB1","DQA1","DQB1","DRB1","DRB3","DRB4","DRB5")
-  }
-  viridis_direction <- ifelse(reverse == T, -1, 1)
-  df %>% 
-    mutate(field = reformat_hla_field(field)) %>% 
-    mutate(genotyper = reformat_hla_genotyper(genotyper)) %>% 
-    filter(frequency <= 1) %>% 
-    filter(locus %in% loci) %>% 
-    mutate(count = frequency*2) %>% 
-    ggplot(aes(x = genotyper))+
-    geom_bar(aes(fill = factor(count)), position = "fill", color = "black", size = 0.25) +
-    facet_grid(locus ~ field)+
-    theme_bw()+
-    scale_fill_viridis_d(option = color, direction = viridis_direction)+
-    scale_y_continuous(breaks = c(0,0.5,1.0))+
-    labs(x="",y="Proportion of samples",fill="Number \nof alleles") +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1),
-          strip.background.x = element_blank())
-}
-
-
 # Removes invalid locus:field:genotyper combinations from an accuracy data frame
 # Makes assumption that accuracy = 0 for every occurence if the combination is invalid (shortcut)
 remove_invalid_combinations <- function(df){
@@ -375,13 +343,15 @@ gg_coverage <- function(df,
   df <- df %>% 
     filter(field == field_var) %>% # Limit to only one field
     mutate(genotyper = reformat_hla_genotyper(genotyper)) %>% # Reformat genotyper names
-    filter_at(y_var, function(x) !is.na(x))
-  ## Remove genotypers not valid for a given genotyper:locus:field combo
-  if (y_var=="accuracy"){
-    df <- remove_invalid_combinations(df)}
+    filter_at(y_var, function(x) !is.na(x)) %>% 
+    mutate(n_alleles = factor(n_alleles, levels = 0:2)) %>% 
+    remove_invalid_combinations()
+  # ## Remove genotypers not valid for a given genotyper:locus:field combo
+  # if (y_var=="accuracy"){
+  #   df <- remove_invalid_combinations(df)}
   
   # Set some constants
-  y_max = max(df[[y_var]], na.rm = T)
+  y_max = max(as.numeric(df[[y_var]]), na.rm = T)
   y_scale_factor = y_max*0.05
   x_lab <- case_when(x_var == "reads" ~ "Reads",
                      x_var == "coverage" ~ "Coverage",
@@ -407,24 +377,54 @@ gg_coverage <- function(df,
     # Create a supplemental DF that translates accuracy slightly based on genotyper
     filter_df <- df %>% 
       mutate(grouper = genotyper) %>% group_by(grouper) %>% nest() %>% ungroup() %>% 
-      mutate(nudge_factor = c(0.025, 0, -0.025)) %>% 
+      mutate(nudge_factor = c(0.04, 0, -0.04)) %>% 
       mutate(data = map2(data, nudge_factor, function(df,n) df %>% mutate_at(y_var, ~!!sym(y_var)+n))) %>% 
       unnest(data)
-    point_layer <- list(geom_jitter(data = filter_df, size=0.2,alpha=0.5,height = 0.01))} 
+    point_layer <- list(geom_jitter(data = filter_df, size=0.2,alpha=0.5,height = 0.01),
+                        geom_smooth(method = "lm"),
+                        coord_cartesian(ylim = c(-0.1,y_max*1.05)))} 
   if (y_var == "n_alleles"){
-    point_layer <- list(geom_jitter(size = 5*y_scale_factor, color = "black", width = 0, height = y_scale_factor, alpha = 0.5))}
+    point_layer <- list(geom_jitter(size = 2*y_scale_factor, color = "black", width = 0, height = 2*y_scale_factor, alpha = 2*y_scale_factor))}
   
   # Assemble full plot
   base_layer + 
     point_layer +
-    geom_smooth(method = "lm")+
     theme_bw() +
     facet_layer+
-    coord_cartesian(ylim = c(-0.1,y_max))+
-    scale_y_continuous(n.breaks = 6)+
+    # scale_y_continuous(n.breaks = 6)+
     labs(y = y_lab, x = x_lab, color = "Genotyper")+
     theme(panel.spacing = unit(0.1,"line"),
           axis.text.x = element_text(angle = 45, hjust = 1)) +
     guides(color=guide_legend(override.aes=list(fill=NA, size=5))) +
     scale_color_brewer(palette = "Dark2")
+}
+
+
+
+
+
+### OLD WORK
+
+### Replaced by gg_hla_predicition_tally
+### Older version that plotted allele frequency rather than count
+OLDgg_hla_prediction_frequency <- function(df, loci = NULL, color = "viridis", reverse = F){
+  if (is.null(loci)){
+    loci <- c("A","B","C","DPA1","DPB1","DQA1","DQB1","DRB1","DRB3","DRB4","DRB5")
+  }
+  viridis_direction <- ifelse(reverse == T, -1, 1)
+  df %>% 
+    mutate(field = reformat_hla_field(field)) %>% 
+    mutate(genotyper = reformat_hla_genotyper(genotyper)) %>% 
+    filter(frequency <= 1) %>% 
+    filter(locus %in% loci) %>% 
+    mutate(count = frequency*2) %>% 
+    ggplot(aes(x = genotyper))+
+    geom_bar(aes(fill = factor(count)), position = "fill", color = "black", size = 0.25) +
+    facet_grid(locus ~ field)+
+    theme_bw()+
+    scale_fill_viridis_d(option = color, direction = viridis_direction)+
+    scale_y_continuous(breaks = c(0,0.5,1.0))+
+    labs(x="",y="Proportion of samples",fill="Number \nof alleles") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1),
+          strip.background.x = element_blank())
 }

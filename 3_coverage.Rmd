@@ -176,17 +176,37 @@ subsample_reads_combined_df <- subsample_reads_accuracy_df %>%
   filter(grepl("^[ABC]|D.[AB]1", locus) & grepl("-(AC|BL)", sample) & genotyper != "hlaminer") 
 ```
 
-### Coverage plots
+### Reads plots
 ```{r, fig.width=12, fig.height=2.5, warning = F, message = F}
-gg_coverage(subsample_reads_combined_df, x_var = "coverage", y_var = "accuracy") 
+gg_coverage(subsample_reads_combined_df, x_var = "reads", y_var = "accuracy") 
+plt_read_accuracy_all <- gg_coverage(subsample_reads_combined_df, x_var = "reads", y_var = "accuracy") 
+plt_read_accuracy_abc <- gg_coverage(subsample_reads_combined_df %>% filter(grepl("^[ABC]", locus)), x_var = "reads", y_var = "accuracy") 
 ```
 ```{r, fig.width=12, fig.height=2.5, warning = F, message = F}
-gg_coverage(subsample_reads_combined_df, x_var = "coverage", y_var = "success")
+gg_coverage(subsample_reads_combined_df, x_var = "reads", y_var = "success")
+plt_read_success_all <- gg_coverage(subsample_reads_combined_df, x_var = "reads", y_var = "success")
+plt_read_success_abc <- gg_coverage(subsample_reads_combined_df %>% filter(grepl("^[ABC]", locus)), x_var = "reads", y_var = "success") 
 ```
-```{r, fig.width=12, fig.height=4, warning = F, message = F}
-gg_coverage(subsample_reads_combined_df, x_var = "coverage", y_var = "n_alleles", facet_genotyper = T)
+```{r, fig.width=12, fig.height=3, warning = F, message = F}
+gg_coverage(subsample_reads_combined_df, x_var = "reads", y_var = "n_alleles", facet_genotyper = T)
+plt_read_allele_all <- gg_coverage(subsample_reads_combined_df, x_var = "reads", y_var = "n_alleles", facet_genotyper = T)
+plt_read_allele_abc <- gg_coverage(subsample_reads_combined_df %>% filter(grepl("^[ABC]", locus)), x_var = "reads", y_var = "n_alleles", facet_genotyper = T)
 ```
+- Default arcasHLA cut off 75 reads (log10 = 1.8)
 
+```{r, fig.width=12, fig.height=3, warning = F, message = F}
+subsample_reads_combined_df %>% 
+  filter(field == "field_2") %>% 
+  mutate(n_alleles = factor(n_alleles, levels = 0:2)) %>% 
+  ggplot(aes(y = n_alleles, x = log10(coverage)))+
+  # geom_violin(scale = "count", alpha = 0.5, )+
+  geom_jitter(size = 0.2, width = 0, height =0.2, alpha = 0.2)+
+  # geom_boxplot(width=0.1)+
+  # ggbeeswarm::geom_beeswarm(size = 0.1, alpha = 0.1)+
+  # coord_flip()+
+  facet_grid(genotyper ~ locus, scales = "free")+
+  theme_bw()
+```
 
 # Subsample CELLS
 
@@ -297,12 +317,283 @@ gg_coverage(subsample_cells_combined_df, x_var = "coverage", y_var = "n_alleles"
 
 ```{r, fig.width=12, fig.height=2.5, warning = F, message = F}
 gg_coverage(subsample_cells_combined_df, x_var = "n_cells", y_var = "accuracy") 
+plt_cell_accuracy_all <- gg_coverage(subsample_cells_combined_df, x_var = "n_cells", y_var = "accuracy") 
+plt_cell_accuracy_abc <- gg_coverage(subsample_cells_combined_df %>% filter(grepl("^[ABC]", locus)), x_var = "n_cells", y_var = "accuracy") 
 ```
 ```{r, fig.width=12, fig.height=2.5, warning = F, message = F}
 gg_coverage(subsample_cells_combined_df, x_var = "n_cells", y_var = "success") 
+plt_cell_success_all <- gg_coverage(subsample_cells_combined_df, x_var = "n_cells", y_var = "success") 
+plt_cell_success_abc <- gg_coverage(subsample_cells_combined_df %>% filter(grepl("^[ABC]", locus)), x_var = "n_cells", y_var = "success") 
 ```
 ```{r, fig.width=12, fig.height=3, warning = F, message = F}
 gg_coverage(subsample_cells_combined_df, x_var = "n_cells", y_var = "n_alleles", facet_genotyper = T)
+plt_cell_allele_all <- gg_coverage(subsample_cells_combined_df, x_var = "n_cells", y_var = "n_alleles", facet_genotyper = T)
+plt_cell_allele_abc <- gg_coverage(subsample_cells_combined_df %>% filter(grepl("^[ABC]", locus)), x_var = "n_cells", y_var = "n_alleles", facet_genotyper = T)
+```
+
+# Combined plots
+```{r, fig.width = 9, fig.height = 7, message = F, warning = F}
+no_leg <- list(theme(legend.position = "none"))
+legend <- cowplot::get_legend(plt_read_accuracy_abc)
+plot_grid(
+  plot_grid(
+    plt_read_accuracy_abc + no_leg,
+    plt_read_success_abc + no_leg,
+    plt_read_allele_abc,
+    ncol = 1,
+    align = "v",
+    axis = "lr",
+    rel_heights = c(1,1,1.2),
+    labels = LETTERS[1:3]
+  ),
+  plot_grid(
+    plt_cell_accuracy_abc + no_leg,
+    plt_cell_success_abc + no_leg,
+    plt_cell_allele_abc,
+    ncol = 1,
+    align = "v",
+    axis = "lr",
+    rel_heights = c(1,1,1.2),
+    labels = LETTERS[4:6]
+  ),
+  plot_grid(
+    legend,
+    legend,
+    NA,
+    ncol = 1
+  ),
+  nrow = 1,
+  rel_widths = c(1,1,0.25)
+)
+```
+
+```{r, fig.width = 18, fig.height = 7, message = F, warning = F}
+no_leg <- list(theme(legend.position = "none"))
+legend <- cowplot::get_legend(plt_read_accuracy_all)
+plot_grid(
+  plot_grid(
+    plt_read_accuracy_all + no_leg,
+    plt_read_success_all + no_leg,
+    plt_read_allele_all,
+    ncol = 1,
+    align = "v",
+    axis = "lr",
+    rel_heights = c(1,1,1.2),
+    labels = LETTERS[1:3]
+  ),
+  plot_grid(
+    plt_cell_accuracy_all + no_leg,
+    plt_cell_success_all + no_leg,
+    plt_cell_allele_all,
+    ncol = 1,
+    align = "v",
+    axis = "lr",
+    rel_heights = c(1,1,1.2),
+    labels = LETTERS[4:6]
+  ),
+  plot_grid(
+    legend,
+    legend,
+    NA,
+    ncol = 1
+  ),
+  nrow = 1,
+  rel_widths = c(1,1,0.25)
+)
+```
+
+# Slope stats
+
+```{r}
+get_lm_stats <- function(df, x_var = "coverage", y_var = "accuracy", field_var = "field_2", x_log = T){
+  # Input checks
+  arg_col <- makeAssertCollection()
+  assertChoice(y_var, c("accuracy", "success", "n_alleles"), add = arg_col)
+  assertChoice(x_var, c("reads", "coverage", "n_cells"), add = arg_col)
+  assertChoice(field_var, c("field_1", "field_2", "field_3"), add = arg_col)
+  assertLogical(x_log, add = arg_col)
+  if (arg_col$isEmpty()==F) {map(arg_col$getMessages(),print);reportAssertions(arg_col)}
+  
+  # browser()
+  df <- df %>% 
+    filter(field == field_var) %>% 
+    remove_invalid_combinations()
+  if (x_log ==T){df <- df %>% mutate_at(x_var, log10)}
+  df %>%
+  filter_at(x_var, function(x) !is.na(x) & !is.infinite(x)) %>% 
+  group_by(locus, field, genotyper) %>%
+  nest() %>%
+  mutate(data = map(data, function(x){
+    summary(lm(!!sym(y_var) ~ !!sym(x_var), data = x)) %>% broom::tidy() %>% filter(term == x_var)
+  })) %>% unnest_wider(data) %>%
+  mutate(est_min = round(estimate - 2*std.error, 2),
+         est_max = round(estimate + 2*std.error, 2))
+}
+
+model_stats <- get_lm_stats(subsample_cells_combined_df, x_var = "reads", y_var = "accuracy", x_log = T)
+model_stats
+```
+
+```{r}
+model_stats <- bind_rows(
+  get_lm_stats(subsample_reads_combined_df, x_var = "reads", y_var = "accuracy", x_log = T) %>% mutate(x_var = "reads", y_var = "accuracy"),
+  get_lm_stats(subsample_reads_combined_df, x_var = "reads", y_var = "success", x_log = T) %>% mutate(x_var = "reads", y_var = "success"),
+  get_lm_stats(subsample_cells_combined_df, x_var = "n_cells", y_var = "accuracy", x_log = T) %>% mutate(x_var = "cells", y_var = "accuracy"),
+  get_lm_stats(subsample_cells_combined_df, x_var = "n_cells", y_var = "success", x_log = T) %>% mutate(x_var = "cells", y_var = "success")
+)  %>% 
+  # filter(grepl("^[ABC]", locus)) %>% 
+  ungroup() %>% 
+  filter(field == "field_2") 
 ```
 
 
+
+# Table
+```{r}
+col_vars <- c("x_var", "locus")
+row_vars <- c("y_var", "genotyper")
+
+flex_df <- model_stats %>% 
+  # filter(grepl("^[ABC]", locus)) %>% 
+  ungroup() %>% 
+  filter(field == "field_2") %>% 
+  mutate(CI = sprintf("(%s) - (%s)", est_min, est_max)) %>% 
+  mutate(genotyper = reformat_hla_genotyper(genotyper)) %>% 
+  select(genotyper, locus, CI, x_var, y_var) %>% 
+  pivot_wider(names_from = col_vars, values_from = "CI", names_sep =  "-") 
+
+df_key <- tibble(col_keys = names(flex_df)) %>% 
+  filter(!(col_keys %in% c(col_vars, row_vars))) %>% 
+  separate(col_keys, into = col_vars, sep = "-", remove = F) %>%
+  mutate_at(vars(contains("genotyper")), reformat_hla_genotyper) %>% 
+  arrange_at(col_vars) %>% 
+  mutate_all(as.character) %>% 
+  mutate_at(col_vars[!(col_vars %in% "locus")], str_to_sentence)
+
+flex_df %>% 
+  select(row_vars, everything()) %>% 
+  mutate_at(row_vars[!(row_vars %in% "genotyper")], str_to_sentence) %>% 
+  # select(locus, df_key$col_keys) %>% 
+  flextable() %>% 
+  colformat_char(na_str = "---") %>%
+  merge_v(j=1:2) %>% 
+  set_header_df(mapping = df_key, key = "col_keys") %>% 
+  merge_h(part = "header") %>%
+  theme_vanilla() %>% 
+  # vline(j=vlines_sequence, border = fp_border_default()) %>%
+  fix_border_issues() %>% 
+  autofit() %>% 
+  fontsize(size = 8, part = "all") %>% 
+  print(preview = "pptx")
+```
+
+
+```{r}
+  df <- df %>% 
+    mutate(field = reformat_hla_field(field)) %>% 
+    mutate_at(vars(contains("genotyper")), reformat_hla_genotyper) %>% 
+    mutate(cell_value = ifelse(!is.na(se), 
+                               sprintf("%s %s %s", round(mean_accuracy,2),"\u00B1",round(se,2)),
+                               sprintf("%s", round(mean_accuracy,2)))) %>%
+    mutate(cell_value = ifelse(grepl("NA", cell_value), NA, cell_value)) %>% 
+    select(-sd,-se, -mean_accuracy) %>% 
+    pivot_wider(names_from = nesting_vars, values_from = "cell_value", names_sep = "-") 
+  
+  df_key <- suppressWarnings({tibble(col_keys = names(df)) %>% 
+      filter(!grepl("locus", col_keys)) %>% 
+      separate(col_keys, into = nesting_vars, sep = "-", remove = F) %>%
+      mutate_at(vars(contains("genotyper")), reformat_hla_genotyper) %>% 
+      arrange_at(nesting_vars) %>% 
+      mutate_all(as.character)
+  })
+  
+  vline_var <- tail(nesting_vars,1)
+  vlines_sequence <- seq(1,nrow(df_key),by = length(unique(df_key[[vline_var]])))
+  df <- df %>% 
+    select(locus, df_key$col_keys) %>% 
+    flextable() %>% 
+    colformat_char(na_str = "---") %>% 
+    set_header_df(mapping = df_key, key = "col_keys") %>% 
+    merge_h(part = "header") %>% 
+    theme_vanilla() %>% 
+    vline(j=vlines_sequence, border = fp_border_default()) %>%
+    fix_border_issues()
+  return(df)
+```
+
+
+
+
+
+# Scratch work
+
+```{r, fig.width=12, fig.height=3, warning = F, message = F}
+subsample_cells_combined_df %>% 
+  filter(field == "field_2") %>% 
+  mutate(n_alleles = factor(n_alleles, levels = 0:2)) %>% 
+  ggplot(aes(x = n_alleles, y = log10(n_cells)))+
+  geom_violin(scale = "width")+
+  geom_jitter(size = 0.2, height = 0, width =0.05, alpha = 0.2)+
+  # geom_boxplot(width=0.1)+
+  # ggbeeswarm::geom_beeswarm(size = 0.1, alpha = 0.1)+
+  coord_flip()+
+  facet_grid(genotyper ~ locus, scales = "free")+
+  theme_bw()
+```
+# Coverage stats
+```{r, fig.width=12, fig.height=3, warning = F, message = F}
+subsample_cells_combined_df %>% 
+  ggplot(aes(x = n_cells, y = coverage, color = genotyper)) + 
+  geom_point() +
+  facet_wrap(genotyper ~ locus, scales = "free", nrow = 3) + 
+  theme_bw() +
+  theme(strip.text = element_blank(),
+        axis.text.x = element_text(angle = 45, hjust = 1))+
+  scale_color_brewer(palette = "Dark2")
+```
+
+```{r, fig.width=16, fig.height=3, warning = F, message = F}
+subsample_cells_combined_df %>% 
+  select(-genotyper) %>% distinct() %>% 
+  mutate(cov_per_cell = coverage/n_cells) %>% 
+  ggplot(aes(x = log10(n_cells), y = cov_per_cell)) + 
+  geom_point(color = "black", alpha = 0.1) +
+  stat_smooth(method = "lm")+
+  # stat_smooth()+
+    facet_wrap( ~ locus, scales = "free", nrow = 1) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  scale_color_brewer(palette = "Dark2")
+```
+
+```{r, fig.width=16, fig.height=6, warning = F, message = F}
+subsample_cells_combined_df %>% 
+  select(-genotyper) %>% distinct() %>% 
+  filter(!is.na(n_cells)) %>% 
+  mutate(cov_per_cell = coverage/n_cells) %>% 
+  mutate(n_cells = cut(n_cells, seq(0,10000,by=2500), right = F)) %>% 
+  ggplot(aes(x = n_cells, y = cov_per_cell)) + 
+  stat_summary(fun = function(x) mean(x,na.rm=T), geom = "bar") +
+  # geom_point(color = "black", alpha = 0.1) +
+  # stat_smooth(method = "lm")+
+  # stat_smooth()+
+  facet_wrap( ~ locus, scales = "free", nrow = 1) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  scale_color_brewer(palette = "Dark2")
+```
+
+```{r}
+hist(cut(1:100, seq(1,100,10)))
+```
+
+```{r}
+subsample_cells_combined_df %>% 
+  ungroup() %>% 
+  count(genotyper, locus, field)
+```
+```{r}
+subsample_reads_combined_df %>% 
+  ungroup() %>% 
+  count(genotyper, locus, field)
+```
