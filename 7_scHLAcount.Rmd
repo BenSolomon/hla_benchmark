@@ -6,8 +6,11 @@ output: html_notebook
 ```{r}
 library(tidyverse)
 library(meta)
+library(cowplot)
 source("data_import_functions.R")
+source("figure_format_functions.R")
 all_hla_expanded <- readRDS("all_hla_expanded.RDS")
+isb_path <- "/labs/khatrilab/solomonb/covid/isb"
 ```
 
 
@@ -64,58 +67,70 @@ hla_merge %>%
 
 # UMAP projections
 
+### Cell clusters
+
 ```{r}
 srt <- readRDS("/labs/khatrilab/hongzheng/webapps/isb/srt_isb260.meta.rds")
+cells <- c("CD14 Monocyte", "CD4 T", "CD8 T", "NK", "B", "CD16 Monocyte", "cDC", "pDC")
+srt <- srt %>% filter(celltype %in% cells)
 ```
 
 ```{r}
-srt %>% 
-  filter(sampleID == "INCOV005-BL") %>% 
-  # sample_frac(0.1) %>%
-  ggplot(aes(x = UMAP_1, y = UMAP_2, color = celltype)) +
-  geom_point(size = 0.5, alpha = 0.5)+
-  theme_bw() 
+gg_srt_relabel <- function(df, x_var, y_var, color_var, cell_fraction = 1){
+  plt <- df %>% 
+    ggplot(aes(x = !!sym(x_var), y = !!sym(y_var), color = !!sym(color_var))) +
+    geom_point(size = 0.5, alpha = 0.5)+
+    theme_bw() +
+    scale_color_brewer(palette = "Dark2")+
+    guides(color = guide_legend(override.aes = list(size = 2, alpha = 1)))
+  
+  g <- ggplot_build(plt)
+  
+  plt_ids <- g$data[[1]]
+  group_levels <- levels(factor(g$plot$data[[g$plot$labels$colour]]))
+  
+  plt_key <- g$data[[1]] %>% 
+    select(colour, group) %>% 
+    distinct() %>% 
+    mutate(label = map_chr(group, function(x) group_levels[x])) %>% 
+    mutate(label = factor(label, level = group_levels)) %>%
+    mutate(label = sprintf("%s) %s", 1:n(), label)) %>% 
+    select(-group)
+  
+  plt_df <- plt_ids %>% 
+    left_join(plt_key, by = "colour")
+  
+  plt_center <- plt_df %>% 
+    group_by(label) %>% summarise(x = mean(x), y = mean(y)) %>%
+    mutate(label = gsub(").*","",label))
+  
+  plt_repel <- plt_df %>% 
+    ggplot(aes(x=x,y=y,color=label)) +
+    geom_point(size = 0.5)+
+    ggrepel::geom_text_repel(data=plt_center,
+                             aes(label=label,  bg.color="white", bg.r=0.25),
+                             color = "black",
+                             fontface = "bold") +
+    theme_bw() +
+    guides(color = guide_legend(override.aes = list(size = 2) ) ) +
+    labs(x=x_var, y = y_var, color = color_var) +
+    theme(axis.text = element_blank(), axis.ticks = element_blank())
+  return(plt_repel)
+}
 
+plt_srt <- srt %>% 
+  filter(sampleID == "INCOV069-BL") %>% 
+  gg_srt_relabel(x_var = "UMAP_1", y_var = "UMAP_2", color_var = "celltype", cell_fraction = 0.1) +
+  scale_color_brewer(palette = "Dark2")+ 
+  theme(axis.text = element_blank(), axis.ticks = element_blank()) +
+  labs(x="UMAP 1", y = "UMAP 2", color = "Cell Cluster")
+plt_srt
 ```
+### Allele frequency
 
-
-```{r}
-x <- scHLA_data_processing(
-  sample="INCOV005-BL_S7",
-  result_dir=sprintf("%s/scHLAcount/output/invitro", isb_path),
-  barcode_dir=sprintf("%s/scHLAcount/barcodes", isb_path)
-)
-x
-```
-
-```{r}
-y <- x %>% select(cell, allele, allele_order, locus, allele_ratio) %>% 
-  pivot_wider(names_from = "allele_order", values_from = c("allele", "allele_ratio")) %>% 
-  filter(locus == "A")
-```
-
-```{r}
-srt %>% 
-  filter(sampleID == "INCOV005-BL") %>% 
-  left_join(x %>% filter(locus == "A"), by = "cell") %>% 
-  filter(!is.na(allele)) %>% 
-    ggplot(aes(x = UMAP_1, y = UMAP_2, color = allele_ratio)) +
-  geom_point(size = 0.5, alpha = 0.5)+
-  theme_bw() +
-  facet_grid(.~allele)+
-  scale_color_gradient2(high = "red", mid = "grey80", low = "blue", midpoint = 0.5, na.value = "transparent")
-```
-
-```{r}
-
-```
-
-```{r}
-
-```
-
-```{r, fig.width = 9, fig.height = 8}
-samp <- "INCOV008-BL"
+```{r, fig.width = 12, fig.height = 6}
+samp <- "INCOV069-BL"
+gene_select <- "A"
 scHLAcount_dir <- sprintf("%s/scHLAcount", isb_path)
 
 # Create tibble of all genotyper and sample combinations
@@ -128,25 +143,42 @@ allele_data <- tibble(genotyper = c("invitro", "arcasHLA", "optitype", "phlat", 
          barcode_path = sprintf("%s/barcodes", scHLAcount_dir)) %>% 
   # head(2) %>%
   mutate(data = pmap(list(sample, result_path, barcode_path), function(s,r,b){
-    scHLA_data_processing(
+    df <- scHLA_data_processing(
       sample=s,
       result_dir=r,
       barcode_dir=b
-    )
-  })) %>% unnest(data) 
+    ) 
+  })) %>% 
+  unnest(data) %>% 
+  filter(gene == gene_select) %>% 
+  mutate(genotyper = reformat_hla_genotyper(genotyper)) %>% 
+  mutate(allele_order = fct_recode(factor(allele_order), "Allele 1" = "1", "Allele 2" = "2"))
+allele_data
+  
+allele_label <- allele_data %>% 
+  select(genotyper, allele_order, allele) %>% 
+  distinct()
 
-srt %>% 
-  filter(sampleID == samp) %>% 
-  left_join(allele_data %>% filter(locus == "A"), by = "cell") %>% 
+plt <- srt %>% 
+  left_join(allele_data %>% filter(gene == gene_select), by = "cell") %>% 
   filter(!is.na(allele)) %>% 
-    ggplot(aes(x = UMAP_1, y = UMAP_2, color = allele_ratio)) +
+  ggplot(aes(x = UMAP_1, y = UMAP_2, color = allele_ratio)) +
   geom_point(size = 0.5, alpha = 0.5)+
   theme_bw() +
-  facet_grid(genotyper~allele)+
-  scale_color_gradient2(high = "red", mid = "grey80", low = "blue", midpoint = 0.5, na.value = "transparent")
+  facet_grid(allele_order~genotyper)+
+  scale_color_gradient2(high = "red", mid = "grey80", low = "blue", midpoint = 0.5, na.value = "transparent") +
+  labs(x="UMAP 1", y="UMAP 2", color = "Allele \nFrequency")+
+  theme(axis.ticks = element_blank(), axis.text = element_blank())+
+  coord_cartesian(ylim = c(-10,15))
+plt_allele_freq <- plt+
+  geom_label(data = allele_label, aes(x=-10,y=14, color = NULL, label = allele), size = 3, hjust = 0)
+plt_allele_freq
 ```
-```{r, fig.width = 9, fig.height = 4}
-samp <- "INCOV028-BL"
+
+### Maximum allele
+
+```{r, fig.width = 12, fig.height = 3}
+samp <- "INCOV069-BL"
 scHLAcount_dir <- sprintf("%s/scHLAcount", isb_path)
 
 # Create tibble of all genotyper and sample combinations
@@ -165,31 +197,40 @@ allele_data <- tibble(genotyper = c("invitro", "arcasHLA", "optitype", "phlat", 
       barcode_dir=b
     )
   })) %>% unnest(data) %>% 
-  select(genotyper, cell, locus, allele_order, allele_ratio) %>% 
+  select(genotyper, cell, gene, allele_order, allele_ratio) %>% 
   # group_by(genotyper, cell, allele_order) %>%  mutate(test = length(allele_order))
   pivot_wider(names_from = "allele_order", values_from = "allele_ratio", names_prefix = "allele_") %>% 
   rowwise() %>% 
   mutate(max_ratio = max(across(contains("allele_")), na.rm = T)) %>% 
-  select(genotyper, cell, locus, max_ratio)
+  select(genotyper, cell, gene, max_ratio) %>% 
+  filter(gene == gene_select) %>% 
+  mutate(genotyper = reformat_hla_genotyper(genotyper))
 
 
-srt %>% 
-  filter(sampleID == samp) %>% 
-  left_join(allele_data %>% filter(locus == "A"), by = "cell") %>% 
+plt_max_allele <- srt %>% 
+  left_join(allele_data %>% filter(gene == "A"), by = "cell") %>% 
   mutate(genotyper = fct_relevel(genotyper, "invitro")) %>% 
   filter(!is.na(genotyper)) %>%
     ggplot(aes(x = UMAP_1, y = UMAP_2, color = max_ratio)) +
   geom_point(size = 0.5, alpha = 0.5)+
   theme_bw() +
   facet_grid(.~genotyper)+
-  scale_color_gradient(high = "red", low = "blue", na.value = "transparent")
+  scale_color_gradient(high = "red", low = "blue", na.value = "transparent") +
+  labs(x="UMAP 1", y="UMAP 2", color = "Maximum Allele \nFrequency")+
+  theme(axis.ticks = element_blank(), axis.text = element_blank())
 
-
+plt_max_allele
 # Some OK examples
 # "INCOV028-BL"
 ```
 
 # Meta-analysis approach
+
+```{r}
+srt %>% count(celltype)
+cell_list <- srt %>% filter(celltype == "cDC") %>% pull(cell)
+```
+
 
 ```{r}
 sc_meta <- function(df){
@@ -206,8 +247,8 @@ sc_meta <- function(df){
 
 
 ```{r}
-samp <- "INCOV02[0-9]-BL"
-x <- allele_data <- tibble(genotyper = c("invitro", "arcasHLA", "optitype", "phlat", "hlaminer")) %>% 
+samp <- "INCOV1[0-2][0-9]-BL"
+x <- tibble(genotyper = c("invitro", "arcasHLA", "optitype", "phlat", "hlaminer")) %>% 
   mutate(data = map(genotyper, function(x) suppressMessages(read_tsv("../../covid/isb/scHLAcount/BL_fastq_files.txt", col_names = "sample")))) %>% 
   unnest(data) %>% 
   filter(grepl(samp, sample)) %>% 
@@ -222,13 +263,14 @@ x <- allele_data <- tibble(genotyper = c("invitro", "arcasHLA", "optitype", "phl
       barcode_dir=b
     )
   })) %>% unnest(data)
-
+x
 y <- x %>% 
+  filter(cell %in% cell_list) %>% 
   mutate(sample = gsub("_[A-Z][0-9]$","",sample)) %>% 
   # # filter(n_alleles_observed == 2, grepl("^D[PQR]", gene), sampleID %in% c("INCOV003-AC", "INCOV024-AC")) %>% 
   # select(cell, locus, count, gene_sum_typed, celltype) %>% 
   # group_by(severity, celltype, gene) %>% 
-  filter(locus == "A") %>% 
+  filter(gene == "A") %>% 
   group_by(sample, genotyper) %>% 
   sample_n(500, replace = T) %>%
   mutate(complement = gene_sum_typed - count, expected = 0.5*gene_sum_typed) %>% 
@@ -240,7 +282,7 @@ y <- x %>%
   unnest(data)
 ```
 
-```{r, fig.width = 12, fig.height = 4}
+```{r, fig.width = 24, fig.height = 4}
 y %>%
   mutate(genotyper = factor(genotyper, levels = c("hlaminer","phlat","optitype","arcasHLA","invitro"))) %>% 
   ggplot(aes(x = genotyper, y = TE, ymin = lower, ymax = upper))+
@@ -255,11 +297,123 @@ y %>%
 ```
 
 
+```{r}
+samp <- "INCOV069-BL"
+cell_list <- srt %>% filter(celltype == "cDC") %>% pull(cell)
+x <- tibble(genotyper = c("invitro", "arcasHLA", "optitype", "phlat", "hlaminer")) %>% 
+  mutate(data = map(genotyper, function(x) suppressMessages(read_tsv("../../covid/isb/scHLAcount/BL_fastq_files.txt", col_names = "sample")))) %>% 
+  unnest(data) %>% 
+  filter(grepl(samp, sample)) %>% 
+  # Import data based on sample and genotyper
+  mutate(result_path = sprintf("%s/output/%s",scHLAcount_dir, genotyper),
+         barcode_path = sprintf("%s/barcodes", scHLAcount_dir)) %>% 
+  # head(2) %>%
+  mutate(data = pmap(list(sample, result_path, barcode_path), function(s,r,b){
+    scHLA_data_processing(
+      sample=s,
+      result_dir=r,
+      barcode_dir=b
+    )
+  })) %>% unnest(data)
+y <- x %>% 
+  filter(cell %in% cell_list) %>% 
+  mutate(sample = gsub("_[A-Z][0-9]$","",sample)) %>% 
+  filter(gene == "A") %>% 
+  group_by(sample, genotyper) %>% 
+  sample_n(500, replace = T) %>%
+  mutate(complement = gene_sum_typed - count, expected = 0.5*gene_sum_typed) %>% 
+  rowwise() %>% 
+  mutate(observed = max(across(c(count, complement)))) %>% 
+  group_by(sample, genotyper) %>% 
+  nest() %>% 
+  mutate(data = map(data, sc_meta)) %>% 
+  unnest(data)
+plt_meta <- y %>% 
+  ungroup() %>% 
+  mutate(genotyper = reformat_hla_genotyper(genotyper)) %>% 
+  ggplot(aes(x = genotyper, y = TE, ymin = lower, ymax = upper))+
+  geom_point()+
+  geom_errorbar()+
+  geom_hline(yintercept = 1, linetype = "dashed")+
+  theme_bw()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(y = "Odds ratio of dominant allele", x= NULL)
+plt_meta  
+```
+
+# Assemble plot
+```{r, fig.width = 14, fig.height = 6}
+# plt_allele_freq_lgd <- cowplot::get_legend(plt_allele_freq)
+# plt_max_allele_lgd <- cowplot::get_legend(plt_max_allele)
+col_1 <- plot_grid(
+  plt_allele_freq,
+  plt_max_allele,
+  ncol = 1,
+  rel_heights = c(5,3),
+  align = "v", axis = "lr",
+  labels = LETTERS[1:2]
+)
+
+col_2 <- plot_grid(
+  plt_srt,
+  plt_meta,
+  ncol = 1,
+  align = "v", axis = "lr",
+  labels = LETTERS[3:4],
+  hjust = 0.5
+)
+plot_grid(
+  col_1,
+  col_2, 
+  nrow = 1,
+  rel_widths = c(6,3)
+)
+```
 
 
 
 
 
+
+
+```{r}
+g <- ggplot_build(plt_srt)
+
+plt_ids <- g$data[[1]]
+group_levels <- levels(factor(g$plot$data[[g$plot$labels$colour]]))
+
+plt_key <- g$data[[1]] %>% 
+  select(colour, group) %>% 
+  distinct() %>% 
+  mutate(label = map_chr(group, function(x) group_levels[x])) %>% 
+  mutate(label = factor(label, level = group_levels)) %>%
+  mutate(label = sprintf("%s) %s", 1:n(), label)) %>% 
+  select(-group)
+  
+  # levels(factor(g$plot$data[[g$plot$labels$colour]]))
+  # data.frame(colours = unique(g$data[[1]]["colour"]), 
+  #              label = levels(factor(g$plot$data[[g$plot$labels$colour]]))) %>% 
+
+plt_df <- plt_ids %>% 
+  left_join(plt_key, by = "colour")
+
+plt_center <- plt_df %>% 
+  group_by(label) %>% summarise(x = mean(x), y = mean(y)) %>%
+  mutate(label = gsub(").*","",label))
+
+plt_repel <- plt_df %>% 
+  ggplot(aes(x=x,y=y,color=label)) +
+  geom_point(size = 0.5)+
+  # geom_point(data = plt_center, color = "black", size = 2)
+  ggrepel::geom_text_repel(data=plt_center,aes(label=label,  bg.color="white", bg.r=0.25,min.segment.length = 0),color = "black",fontface = "bold") +
+  theme_bw() +
+  guides(color = guide_legend(override.aes = list(size = 2) ) ) +
+  labs(x="UMAP 1", y = "UMAP 2", color = "Cell Cluster") +
+  scale_color_brewer(palette = "Dark2")+ 
+  theme(axis.text = element_blank(), axis.ticks = element_blank())
+plt_repel
+
+```
 
 
 
