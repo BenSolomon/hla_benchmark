@@ -39,7 +39,7 @@ comp_accuracy_plt <- BL_accuracy %>%
   mutate(mean_accuracy = mean_accuracy.x - mean_accuracy.y) %>% 
   select(locus:genotyper, mean_accuracy) %>% 
   gg_summary_hla_accuracy(color_label = "Time 1 - \nTime 2") +
-  scale_fill_gradientn(colors = RColorBrewer::brewer.pal(11, "BrBG"), limits = c(-1,1), na.value = "transparent")
+  scale_fill_gradientn(colors = RColorBrewer::brewer.pal(11, "BrBG"), na.value = "transparent", limits = c(-0.55,0.55), oob=squish)
 comp_accuracy_plt$layers[[1]]$aes_params$colour <- "black"
 
 time_split_plt <- plot_grid(
@@ -110,7 +110,7 @@ oe_difference_df <- observed_agreement_df %>%
 oe_difference_plt <- oe_difference_df %>%  
   drop_na() %>% 
   gg_summary_hla_accuracy(color_label = "Observed -\nExpected") + 
-  scale_fill_gradientn(colors = RColorBrewer::brewer.pal(11, "BrBG"), limits = c(-1,1), na.value = "transparent")
+  scale_fill_gradientn(colors = RColorBrewer::brewer.pal(11, "BrBG"), na.value = "transparent", limits = c(-0.55,0.55), oob=squish)
 oe_difference_plt$layers[[1]]$aes_params$colour <- "black"
 
 agreement_plt <- plot_grid(

@@ -172,7 +172,7 @@ drb345_bulk_predicted_pseudo %>% filter(copy_number != "2") %>% roc_auc(truth = 
 # Demonstrate that pseudotruth row doesn't affect other ROC classes
 # Reformats outcome as a binary classifier. 
 # Event_level specifies {1} outcome as the base event, so plot should match {1} plot above
-drb345_bulk_outcome %>% 
+drb345_bulk_predicted %>% 
   mutate(copy_number = factor(copy_number, levels = c("0","1"))) %>% 
   roc_curve(truth = copy_number, .pred_1, event_level = "second") %>% 
   autoplot()

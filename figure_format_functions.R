@@ -38,9 +38,9 @@ reformat_hla_genotyper <- function(genotyper_vector, reverse = F){
         "Composite AO",
         "Ground truth",
         "arcasHLA",
-        "OptiType",
+        "HLAminer",
         "PHLAT",
-        "HLAminer"
+        "OptiType"
       ))
   if (reverse == T){output <- fct_rev(output)}
   return(output)
@@ -298,7 +298,7 @@ gg_runtime <- function(df, include_tasks = NULL){
     filter(component %in% include_tasks)  %>%
     mutate(component = factor(component, levels = c(
       "FASTQ-COMPILE", "PRE-FASTQC", "TRIM", "POST-FASTQC", "HISAT-AND-SORT",
-      "INDEX", "ARCAS-EXTRACT", "ARCAS-GENOTYPE", "PHLAT", "OPTITYPE","HLAMINER"
+      "INDEX", "ARCAS-EXTRACT", "ARCAS-GENOTYPE", "OPTITYPE","PHLAT","HLAMINER"
     ))) %>%
     drop_na() %>%
     ggplot(aes(x = component, y = process_time))+
