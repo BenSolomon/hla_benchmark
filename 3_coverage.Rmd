@@ -52,6 +52,7 @@ cell_counts_df <- readRDS("isb_sequenced_cell_count.RDS")
 ### Assemble accuracy DF
 
 ```{r}
+success_df <- readRDS("isb_success.RDS")
 accuracy_df <- readRDS("isb_accuracy_drb345_filtered.RDS")
 accuracy_df <- accuracy_df %>% 
   left_join(
@@ -59,7 +60,7 @@ accuracy_df <- accuracy_df %>%
     by = c("sample", "locus", "field", "genotyper")
   )%>% 
   left_join(alignment_stats_df, by = c("sample", "locus")) %>% 
-  left_join(hla_loci_length_df, by = "locus") %>%
+  left_join(genome_region_reference, by = "locus") %>%
   left_join(cell_counts_df, by = "sample") %>%
   mutate_at(vars(c(reads, bp)), as.numeric) %>% 
   mutate(coverage = (reads * 91)/bp) %>% 
