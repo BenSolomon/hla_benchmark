@@ -43,15 +43,56 @@ arcas_log_dir <- sprintf("%s/arcasHLA", isb_path)
 alignment_stats_df <- hla_mapping_stats_import(isb_samples, arcas_log_dir)
 ```
 
+```{r}
+hla_mapping_stats_import_v2 <- function(samples, log_dir){
+  tibble(sample = samples) %>% 
+    mutate(data = map(sample, function(x){
+      log_path <- sprintf("%s/%s.genotype.log",log_dir,x)
+      df <- tibble(lines = read_lines(log_path))
+      if (any(grepl("error", df$lines, ignore.case = T))){
+        NA
+      } else {
+        total_reads <- df %>% 
+          mutate(lines = gsub("\t", "", lines)) %>% 
+          filter(grepl("^\\[alignment\\] Processed", lines)) %>%
+          mutate(lines = gsub("\\,.*", "", lines)) %>% 
+          mutate(lines = str_extract(lines, "[0-9]+")) %>% 
+          pull(lines) %>% 
+          as.numeric()
+        df %>% 
+          mutate(lines = gsub("\t", "", lines)) %>% 
+          filter(grepl("^HLA", lines)) %>% 
+          separate(lines, into = c("locus", "abundance", "reads", "classes"), sep = " +") %>% 
+          mutate(total_reads = total_reads) %>% 
+          mutate(total_hla_reads = sum(as.numeric(reads)))
+      }
+    })) %>%
+    unnest(data) %>% 
+    select(!(contains("data"))) %>% 
+    separate(locus, into = c(NA, "locus"), sep = "-") %>% 
+    mutate_at(c("reads", "classes"), as.numeric)
+}
+
+arcas_log_dir <- sprintf("%s/arcasHLA", isb_path)
+alignment_stats_df <- hla_mapping_stats_import_v2(isb_samples, arcas_log_dir) %>% 
+  filter(grepl("^[ABC]|^D[PQR][AB]1", locus) & grepl("-(AC|BL)$", sample))%>% 
+  mutate(reads = total_reads)
+alignment_stats_df 
+```
+
+
+
 ### Import cell counts
 
 ```{r}
 cell_counts_df <- readRDS("isb_sequenced_cell_count.RDS")
+cell_counts_df
 ```
 
 ### Assemble accuracy DF
 
 ```{r}
+success_df <- readRDS("isb_success.RDS")
 accuracy_df <- readRDS("isb_accuracy_drb345_filtered.RDS")
 accuracy_df <- accuracy_df %>% 
   left_join(
@@ -59,19 +100,20 @@ accuracy_df <- accuracy_df %>%
     by = c("sample", "locus", "field", "genotyper")
   )%>% 
   left_join(alignment_stats_df, by = c("sample", "locus")) %>% 
-  left_join(hla_loci_length_df, by = "locus") %>%
+  left_join(genome_region_reference, by = "locus") %>%
   left_join(cell_counts_df, by = "sample") %>%
   mutate_at(vars(c(reads, bp)), as.numeric) %>% 
   mutate(coverage = (reads * 91)/bp) %>% 
   mutate(n_alleles = map_dbl(allele, function(x) sum(!is.na(x)))) %>% 
   filter(grepl("^[ABC]|D.[AB]1", locus) & grepl("-(AC|BL)$", sample) & genotyper != "hlaminer") 
+accuracy_df
 ```
 
 
 ### Coverage based plots
 
 ```{r, fig.width=12, fig.height=2.5, warning = F, message = F}
-gg_coverage(accuracy_df, x_var = "coverage", y_var = "accuracy") 
+gg_coverage(accuracy_df, x_var = "reads", y_var = "accuracy") 
 ```
 ```{r, fig.width=12, fig.height=2.5, warning = F, message = F}
 gg_coverage(accuracy_df, x_var = "coverage", y_var = "success")
@@ -131,6 +173,16 @@ subsample_reads_arcas_log_dir <- sprintf("%s/arcasHLA", subsample_reads_path)
 subsample_reads_alignment_stats_df <- hla_mapping_stats_import(subsample_reads_samples, subsample_reads_arcas_log_dir)
 ```
 
+```{r}
+# Import read statistics
+subsample_reads_arcas_log_dir <- sprintf("%s/arcasHLA", subsample_reads_path)
+subsample_reads_alignment_stats_df <- hla_mapping_stats_import_v2(subsample_reads_samples, subsample_reads_arcas_log_dir)
+subsample_reads_alignment_stats_df <- subsample_reads_alignment_stats_df %>% 
+  mutate(reads = total_reads)
+subsample_reads_alignment_stats_df
+```
+
+
 ### Calculate accuracy
 
 ```{r}
@@ -159,6 +211,13 @@ subsample_reads_success_df <- compare_hla(
 )
 # saveRDS(subsample_reads_success_df, "isb_subsample_reads_success.RDS")
 ```
+
+```{r}
+subsample_reads_accuracy_df <- readRDS("isb_subsample_reads_accuracy.RDS")
+subsample_reads_success_df <- readRDS("isb_subsample_reads_success.RDS")
+```
+
+
 
 ```{r}
 # Combine various data
