@@ -1,6 +1,11 @@
 ---
 title: "4) Predicting HLA-DRB4 paralogs"
-output: html_notebook
+output: 
+  html_notebook:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    code_folding: hide
 ---
 
 # Startup
@@ -192,6 +197,8 @@ prop.table(table(drb_test_outcome$copy_number == drb_test_outcome$.pred_class))
 # Update DBR genotypes
 
 ```{r}
+# drb_fit <- readRDS("drb345_knn_model.RDS")
+
 # Predictions from full data
 drb_key <- drb345_df %>% bind_cols(
   drb_fit %>% predict(new_data = drb345_df)
@@ -209,6 +216,104 @@ post_tally_plt <- drb_key %>%
   gg_hla_prediction_tally()
 post_tally_plt
 ```
+```{r, fig.height = 4, fig.width = 5}
+pre_filter_contingency_arcas <- all_hla %>%   
+  allele_tally() %>% 
+  filter(grepl("(BL|AC)$", sample), 
+          grepl("DRB[345]", locus), 
+         genotyper %in% c("invitro", "arcasHLA"),
+         field == "field_2") %>% 
+  dplyr::select(-field) %>% 
+  pivot_wider(names_from = genotyper, values_from = count) %>%
+  mutate(arcasHLA = factor(arcasHLA, levels = c("0","1","2"))) %>% 
+  mutate(prediction = "arcasHLA") %>% 
+  rename(copy_invitro=invitro, copy_predicted=arcasHLA)
+
+pre_filter_contingency_hlaminer <- all_hla %>%   
+  allele_tally() %>% 
+  filter(grepl("(BL|AC)$", sample), 
+          grepl("DRB[345]", locus), 
+         genotyper %in% c("invitro", "hlaminer"),
+         field == "field_2") %>% 
+  dplyr::select(-field) %>% 
+  pivot_wider(names_from = genotyper, values_from = count) %>%
+  mutate(hlaminer = factor(hlaminer, levels = c("0","1","2"))) %>% 
+  mutate(prediction = "HLAminer") %>% 
+  rename(copy_invitro=invitro, copy_predicted=hlaminer)
+
+post_filter_contingency <- 
+  drb_key %>% 
+    rename("copy_invitro" = copy_number, "copy_predicted" = .pred_class) %>% 
+    ungroup() %>% 
+  mutate(prediction = "KNN")
+
+allele_contingency_plt <- bind_rows(pre_filter_contingency_arcas, pre_filter_contingency_hlaminer, post_filter_contingency) %>% 
+  ggplot(aes(x = copy_invitro, fill = copy_predicted))+
+    geom_bar( position = "fill", color = "black", size = 0.25) +
+    facet_grid(locus ~ prediction)+
+    # facet_grid(prediction ~ locus)+
+    theme_bw()+
+    # scale_fill_viridis_d(option = color, direction = viridis_direction)+
+    scale_fill_viridis_d()+
+    scale_y_continuous(breaks = c(0,0.5,1.0))+
+    labs(x="Number of ground truth alleles",y="Proportion of samples",fill="Number \nof predicted\nalleles")
+allele_contingency_plt
+```
+```{r}
+bind_rows(pre_filter_contingency_arcas, pre_filter_contingency_hlaminer, post_filter_contingency) %>% 
+  count(locus, prediction, copy_invitro, copy_predicted) %>% 
+  group_by(locus, prediction, copy_invitro) %>% 
+  mutate(total = sum(n), prop = round(n/total, 2))
+```
+
+
+
+
+
+```{r, fig.width = 3, fig.height=3}
+d <- "manhattan"
+
+drb345_distance <- function(distance){
+  matrix(c(0,0,0,2,2,2),nrow = 2,ncol= 3,byrow = TRUE) %>% 
+    dist(method = distance)
+}
+standardization_factor <- drb345_distance(d)
+
+df_comp <- bind_rows(pre_filter_contingency_arcas, pre_filter_contingency_hlaminer, post_filter_contingency) %>% 
+  mutate(locus = factor(locus)) %>% 
+  group_by(sample, prediction) %>% 
+  nest() %>% 
+  # Create distance matrix input table
+  mutate(data = map(data, function(df){
+    df %>% 
+    pivot_longer(contains("copy"), names_to = "method", values_to = "copy", 
+                 values_transform = list(copy = function(x) as.numeric(as.character(x)))) %>% 
+    complete(locus, method, fill = list(copy = 0)) %>% # Expand to ensure DRB3,4,and 5 column for all
+    pivot_wider(names_from = locus, values_from = copy) %>%
+    select(contains("DRB"))
+    })) %>%
+  # Find distance, standardize to maximum distance, then complement to similarity
+  mutate(data = map_dbl(data, function(x) 1-(dist(x, method = d)/standardization_factor)))
+
+
+drb345_similarity_plt <- df_comp %>% 
+  ggplot(aes(x = prediction, y = data))+
+  geom_violin()+
+  stat_summary(fun = mean, geom="point")+
+  stat_summary(fun.data = mean_se, geom = "errorbar", width = 0.5)+
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  scale_y_continuous(limits = c(0,1)) +
+  labs(y = "HLA-DRB345 copy\nnumber similarity", x = NULL)
+drb345_similarity_plt
+```
+
+```{r}
+df_comp %>% 
+  group_by(prediction) %>% 
+  summarise(mean = mean(data, na.rm = T))
+```
+
 
 #### Filtered DRB accuracy
 
@@ -343,6 +448,32 @@ plot_grid(
   ncol = 1
 )
 ```
+
+### Alternative combined plot
+
+```{r, fig.width = 8, fig.height = 6}
+
+plot_grid(
+  plot_grid(
+    testing_plt, allele_contingency_plt,
+    nrow = 1,
+    align = "h",
+    axis = "bt",
+    labels = c("A","B"),
+    rel_widths = c(1,1)
+  ),
+  plot_grid(
+    drb345_similarity_plt, drb345_accuracy_plt,
+    nrow = 1,
+    align = "h",
+    axis = "bt",
+    rel_widths = c(2,3),
+    labels = c("C","D")
+  ),
+  ncol = 1
+)
+```
+
 
 ### Updating all_hla with filtered DRB345 and verifying
 ```{r}
