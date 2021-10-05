@@ -1,6 +1,11 @@
 ---
 title: "6) Accuracy on 3' 10X platform and bulk"
-output: html_notebook
+output: 
+  html_notebook:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    code_folding: hide
 ---
 
 # Reference info
@@ -18,6 +23,7 @@ output: html_notebook
 library(tidyverse)
 library(tidymodels)
 library(cowplot)
+library(kknn)
 source("data_import_functions.R")
 source("calculation_functions.R")
 source("figure_format_functions.R")
@@ -134,10 +140,14 @@ drb345_bulk_predicted <- apply_drb345_knn(drb345_df_bulk, drb_model)
 
 ### ROC plots and AUC calculations
 ```{r}
+auc_estimator <- "hand_till"
 # Generate ROC plots and AUC
-drb345_ROC_3p <- gg_multilevel_roc(drb345_3p_predicted)
-drb345_ROC_3p
-drb345_3p_predicted %>% roc_auc(truth = copy_number, .pred_0:.pred_2)
+drb345_3p_auc <- drb345_3p_predicted %>% 
+  roc_auc(truth = copy_number, .pred_0:.pred_2, estimator = auc_estimator) %>% 
+  pull(.estimate) %>% 
+  round(.,3)
+drb345_ROC_3p <- gg_multilevel_roc(drb345_3p_predicted) +
+  geom_label(aes(label = sprintf("AUC: %s", drb345_3p_auc), x=0.8, y=0.05, color = NULL), color = "black", size = 3)
 
 
 # None of the bulk RNA samples have 2 alleles for a single DRB345. 
@@ -149,7 +159,13 @@ drb345_bulk_predicted_pseudo <- drb345_bulk_predicted %>%
   mutate_if(is.factor, as.character) %>% 
   rbind(., list("2_copy_pseudotruth",0,0,0,"DRB3","2","2",0,0,1)) %>% 
   mutate_if(is.character, factor)
-  
+
+drb345_bulk_auc <- drb345_bulk_predicted_pseudo %>% 
+  filter(copy_number != "2") %>% # Removing {2} pseudotruth here
+  roc_auc(truth = copy_number, .pred_0:.pred_2, estimator = auc_estimator) %>% 
+  pull(.estimate) %>% 
+  round(.,3)
+
 # Proceed normally from here
 drb345_ROC_bulk <-  drb345_bulk_predicted_pseudo %>% 
   roc_curve(truth = copy_number, .pred_0:.pred_2) %>% 
@@ -162,11 +178,17 @@ drb345_ROC_bulk <-  drb345_bulk_predicted_pseudo %>%
   geom_abline(slope=1,intercept=0, linetype="dotted")+
   theme_bw() +
   scale_color_brewer(palette = "Set1") +
-  labs(x = "1 - Specificity", y = "Sensitivity", color = "Number\nof alleles")
+  labs(x = "1 - Specificity", y = "Sensitivity", color = "Number\nof alleles") +
+  geom_label(aes(label = sprintf("AUC: %s", drb345_bulk_auc), x=0.8, y=0.05, color = NULL), color = "black", size = 3)
+
 drb345_ROC_bulk
-drb345_bulk_predicted_pseudo %>% filter(copy_number != "2") %>% roc_auc(truth = copy_number, .pred_0:.pred_2)
 
 ```
+```{r}
+drb345_bulk_predicted
+```
+
+
 
 ```{r}
 # Demonstrate that pseudotruth row doesn't affect other ROC classes
@@ -188,7 +210,7 @@ drb345_ratio_plt_3p
 drb345_ratio_plt_bulk
 ```
 
-```{r, fig.width=10, fig.height=8}
+```{r, fig.width=8, fig.height=6}
 plot_grid(
   drb345_ROC_3p,
   drb345_ratio_plt_3p,
