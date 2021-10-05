@@ -1,4 +1,4 @@
-library(tidyverse)
+require(tidyverse)
 
 # # For tests
 # isb_path <- "/labs/khatrilab/solomonb/covid/isb"
