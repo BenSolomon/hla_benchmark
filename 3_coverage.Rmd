@@ -252,8 +252,10 @@ subsample_cell_counts_df <- tibble(line = system("wc -l /labs/khatrilab/solomonb
   separate(line, into = c("n_cells", "file"), sep = " /") %>% 
   drop_na() %>% 
   mutate(sample = gsub("\\..*","",basename(file))) %>% 
+  mutate(n_cells = as.numeric(n_cells)) %>% 
   select(-file) %>% 
-  separate(sample, into = c("sample", "subset"), sep = "_")
+  # separate(sample, into = c("sample", "subset"), sep = "_") %>% 
+  bind_rows(cell_counts_df)
 subsample_cell_counts_df
 ```
 
@@ -294,7 +296,7 @@ subsample_cells_combined_df <- subsample_cells_accuracy_df %>%
   )%>% 
   left_join(subsample_cells_alignment_stats_df, by = c("sample", "locus")) %>% 
   left_join(genome_region_reference, by = "locus") %>%
-  left_join(cell_counts_df, by = "sample") %>%
+  left_join(subsample_cell_counts_df, by = "sample") %>%
   bind_rows(accuracy_df) %>% 
   mutate_at(vars(c(reads, bp)), as.numeric) %>% 
   mutate(coverage = (reads * 91)/bp) %>% 
@@ -331,6 +333,21 @@ gg_coverage(subsample_cells_combined_df, x_var = "n_cells", y_var = "n_alleles",
 plt_cell_allele_all <- gg_coverage(subsample_cells_combined_df, x_var = "n_cells", y_var = "n_alleles", facet_genotyper = T)
 plt_cell_allele_abc <- gg_coverage(subsample_cells_combined_df %>% filter(grepl("^[ABC]", locus)), x_var = "n_cells", y_var = "n_alleles", facet_genotyper = T)
 ```
+
+
+```{r, fig.width=12, fig.height=3, warning = F, message = F}
+# subsample_cells_combined_df %>% 
+#   mutate(reads = reads/n_cells) %>% 
+#   filter(reads < 100) %>% 
+#   gg_coverage(x_var = "reads", y_var = "accuracy", x_log = F) 
+```
+
+
+
+
+
+
+
 
 # Combined plots
 ```{r, fig.width = 9, fig.height = 7, message = F, warning = F}
