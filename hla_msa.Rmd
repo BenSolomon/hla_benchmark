@@ -438,7 +438,7 @@ bulk_mapping <- hla_mapping_stats_import_v2(bulk_samples, sprintf("%s/arcasHLA",
   filter(grepl("^[ABC]|^D[PQR][AB]1", locus)) %>% 
   mutate(alignment_efficiency = reads / total_reads) 
 
-data = list(bulk_mapping, p5_mapping, p3_mapping)) %>%
+tibble(orientation = c("Bulk", "5p", "3p"), data = list(bulk_mapping, p5_mapping, p3_mapping)) %>%
   unnest(data) %>%
   mutate(alignment_efficiency = 100 * alignment_efficiency) %>%
   ggplot(aes(x = locus, y = alignment_efficiency, fill = orientation)) +

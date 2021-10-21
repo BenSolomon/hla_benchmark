@@ -25,7 +25,7 @@ invitro_import <- function(path = "hla_2020-10-23_1457.tsv", exclude_comment_sam
     filter(!grepl("Not_Present", allele)) %>% 
     mutate(allele_id = str_extract(allele_id, "[1-2]"),
            genotyper = "invitro") %>% 
-    rename("sample" = "Sample ID")
+    dplyr::rename("sample" = "Sample ID")
 }
 # invitro_import()
 
@@ -119,6 +119,27 @@ hlaminer_import <- function(path, sample){
   }
 }
 # hlaminer_import(path = sprintf("%s/hla_miner", isb_path), sample = "INCOV003-BL")
+
+
+### scHLAcount genotype import
+schlacountGenotype_import <- function(path, sample){
+  sample_path <- sprintf("%s/%s_results/labels.tsv", path, sample)
+  if (file.exists(sample_path)){
+    suppressWarnings(read_tsv(sample_path, col_names = "allele")) %>% 
+      filter(grepl("\\*", allele)) %>% 
+      separate(allele, into = "locus", sep = "\\*", extra = "drop", remove = F) %>% 
+      group_by(locus) %>% 
+      mutate(allele_id = 1:n()) %>% 
+      ungroup() %>% 
+      mutate(genotyper = "scHLAcount") %>% 
+      select(-locus)
+  } else {
+    NULL
+  }
+}
+# schla_path <- "/labs/khatrilab/solomonb/covid/isb/scHLAcount/scHLAcount_genotyping/consolidated_output"
+# schlacountGenotype_import(schla_path, "INCOV003-BL_S5")
+
 
 
 ### Combined import function
