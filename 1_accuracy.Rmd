@@ -88,12 +88,14 @@ success_plt
 
 ```{r, fig.width = 5, fig.height = 4}
 accuracy_plt <-  calculate_summary_df(accuracy_df) %>% 
+  exclude_genotyper_fields() %>% 
   gg_summary_hla_accuracy(color_label = "Accuracy")
 accuracy_plt
 ```
 
 # Full figure
 
+### Version 1
 ```{r,fig.height = 6, fig.width = 9}
 plt_heatmaps <- plot_grid(
   success_plt,
@@ -101,12 +103,17 @@ plt_heatmaps <- plot_grid(
   ncol = 1,
   labels = c("B","C")
 )
-plot_grid(
+plt_fig_main <- plot_grid(
   predictions_plt,
   plt_heatmaps,
   labels = c("A",NA)
 )
+plt_fig_main
 ```
+```{r}
+save_plot("figures/v2/2_accuracy.pdf", plt_fig_main, ncol = 2,nrow = 2, base_asp = 1.4)
+```
+
 
 # Accuracy table
 
@@ -125,48 +132,40 @@ calculate_summary_df(success_df) %>%
   print(preview = "pptx")
 ```
 
+# Supplemental figure
 
-# Accuracy by allele
+### Accuracy by allele
 
 ```{r, fig.width = 16, fig.height = 8}
-accuracy_df %>% 
+plt_allele_accuracy <- accuracy_df %>% 
 gg_allele_hla_accuracy()
+plt_allele_accuracy
 ```
 
-# Accuracy by individual
+### Accuracy by individual
 
 ```{r, fig.width = 12, fig.height = 5}
-accuracy_df %>% 
+plt_individual_accuracy <- accuracy_df %>% 
   gg_individual_hla_accuracy(color = "viridis")
+plt_individual_accuracy
+```
+### Combined supplemental
+
+```{r,fig.height = 8, fig.width = 12}
+plt_supplemental <- plot_grid(
+  plt_allele_accuracy,
+  plt_individual_accuracy,
+  ncol = 1,
+  labels = c("A","B"),
+  align = "v",
+  axis = "lr",
+  rel_heights = c(1, 0.75)
+)
+plt_supplemental
+```
+
+```{r}
+save_plot("figures/v2/s2_extra_accuracy.pdf", plt_supplemental, ncol = 1,nrow = 2, base_asp = 2, base_height = 6)
 ```
 
 
-
-# Old work
-
-<!-- ### Updated accuracy with expanded HLA -->
-
-<!-- ```{r, fig.height=8} -->
-<!-- ### Every subject has molecular HLA typing, but may occur in the BL, AC, or CV timepoint -->
-<!-- ### This expands the molecular HLA typing from the timepoint it occurs to all other time points  -->
-<!-- ### This allows for scRNA genotyping from a given subject and timepoint to be assessed even if that -->
-<!-- ### subjects molecular typing happened at a different time point. Since HLA is genetic, the molecular -->
-<!-- ### typing should not change -->
-<!-- original <- format_hla_table(combine_HLA_import(path = isb_path, samples = isb_samples, expand_invitro = F)) -->
-<!-- expanded <- format_hla_table(combine_HLA_import(path = isb_path, samples = isb_samples, expand_invitro = T)) -->
-
-<!-- original <- compare_hla(hla_df = original, reference = "invitro", exclude_missing = F, compare_function = "accuracy") -->
-<!-- expanded <- compare_hla(hla_df = expanded, reference = "invitro", exclude_missing = F, compare_function = "accuracy") -->
-
-
-<!-- original %>%  -->
-<!--   filter(grepl("^[ABC]", locus)) %>%  -->
-<!--   gg_accuracy() + -->
-<!--   ggtitle("MHC1 loci accuracy", subtitle = "Original in vitro vs. sample pairing") -->
-<!-- expanded %>%  -->
-<!--   filter(grepl("BL$", sample)) %>%  -->
-<!--   filter(grepl("^[ABC]", locus)) %>%  -->
-<!--   gg_accuracy() + -->
-<!--   ggtitle("MHC1 loci accuracy", subtitle = "Expanded HLA invitro vs. sample pairings. BL only") -->
-
-<!-- ``` -->

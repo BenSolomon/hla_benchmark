@@ -37,6 +37,7 @@ reformat_hla_genotyper <- function(genotyper_vector, reverse = F){
         "Composite AOP",
         "Composite AO",
         "Ground truth",
+        "scHLAcount",
         "arcasHLA",
         "HLAminer",
         "PHLAT",
@@ -61,6 +62,21 @@ reformat_hla_loci <- function(loci_vector, reverse = F){
       ))
   if (reverse == T){output <- fct_rev(output)}
   return(output)
+}
+
+### Exclude genotype accuracy values at parameters where specific
+### genotypers do not generate predictions (i.e. make NA instead of 0)
+### Expects input from calculate_summary_df
+exclude_genotyper_fields <- function(df){
+  df %>% 
+    filter(
+      !(genotyper == "hlaminer" & field == "field_3"),
+      !(genotyper == "phlat" & locus %in% c("DPA1", "DPB1", "DRB3", "DRB4", "DRB5")),
+      !(genotyper == "phlat" & locus %in% c("DPA1", "DPB1", "DRB3", "DRB4", "DRB5")),
+      !(genotyper == "optitype" & grepl("^D", locus)),
+      !(genotyper == "optitype" & field == "field_3"),
+      !(genotyper == "scHLAcount" & grepl("DRB[345]", locus))
+    )
 }
 
 
@@ -312,15 +328,16 @@ gg_runtime <- function(df, include_tasks = NULL){
   return(plt)
 }
 
-# Removes invalid locus:field:genotyper combinations from an accuracy data frame
-# Makes assumption that accuracy = 0 for every occurence if the combination is invalid (shortcut)
-remove_invalid_combinations <- function(df){
-  df %>% 
-    group_by(genotyper, locus, field) %>% 
-    mutate(total_accuracy = sum(accuracy, na.rm = T)) %>% 
-    filter(total_accuracy !=0) %>% 
-    select(-total_accuracy)
-}
+# # Removes invalid locus:field:genotyper combinations from an accuracy data frame
+# # Makes assumption that accuracy = 0 for every occurence if the combination is invalid (shortcut)
+# # Used in 3_coverage.Rmd, slope stats
+# remove_invalid_combinations <- function(df){
+#   df %>% 
+#     group_by(genotyper, locus, field) %>% 
+#     mutate(total_accuracy = sum(accuracy, na.rm = T)) %>% 
+#     filter(total_accuracy !=0) %>% 
+#     select(-total_accuracy)
+# }
 
 # Plots accuracy metrics vs coverage metrics
 # Expects and accuracy data frame

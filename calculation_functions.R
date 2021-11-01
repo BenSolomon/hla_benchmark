@@ -3,6 +3,8 @@ library(tidymodels)
 library(checkmate)
 library(lubridate)
 
+source("data_import_functions.R")
+source("figure_format_functions.R")
 
 # Bray-Curtis similarity is ideal metric for matching when ref and comp both have 2 alleles
 # Will be used inside of allele_match, which also has specifications for when n allele != 2
@@ -199,19 +201,20 @@ compare_hla<- function(hla_df,
 
 ### Expects format from accuracy_functions::compare_hla
 ### Summarizes accuracy across locus, field, and genotyper
-calculate_summary_df <- function(df){
-  suppressMessages({df %>% 
+calculate_summary_df <- function(df, remove_invalid=T){
+  df <- suppressMessages({df %>% 
       group_by(locus, field, genotyper) %>% 
       summarise(mean_accuracy = mean(accuracy, na.rm = T),
                 sd = sd(accuracy, na.rm=T),
                 se = sd(accuracy, na.rm=T)/sqrt(n()),
                 n =) %>% 
       ungroup() %>% 
-      mutate(mean_accuracy = ifelse(mean_accuracy == 0, NA, mean_accuracy), 
-             sd = ifelse(mean_accuracy == 0, NA, sd),
-             se = ifelse(mean_accuracy == 0, NA, se),
-             locus = factor(locus, levels = sort(unique(locus), decreasing = T)))
+      mutate(locus = factor(locus, levels = sort(unique(locus), decreasing = T)))
   })
+  if (remove_invalid == T){
+    df <- df %>% exclude_genotyper_fields()
+  }
+  return(df)
 }
 
 
