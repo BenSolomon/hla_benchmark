@@ -329,11 +329,14 @@ entropy_plt <- hla_entropy %>%
   group_by(locus) %>% 
   mutate(shannon_roll = zoo::rollapply(shannon, width = step, mean, partial = T)) %>% 
   arrange(position) %>% 
-  gg_combo_entropy(., locus) +
+  # gg_combo_entropy(., locus) +
+  ggplot(aes(x = position, y = shannon_roll)) + 
+  geom_path(size = 1, color = "grey25")+
   facet_grid(. ~ locus, scale = "free_x") +
+  theme_bw()+
   theme(legend.position = "none",
         axis.text.x = element_text(angle = 45, hjust = 1)) +
-  labs(x="Position (bp)")
+  labs(y = "Shannon entropy", x="Position (bp)")
 entropy_plt
 ```
 
@@ -558,8 +561,7 @@ match_x_axis <- function(target, source) {
 ```{r, fig.width=10, fig.height = 8}
 plt_fig_main <- plot_grid(
   match_x_axis(target = entropy_plt, source = all_coverage_plt)+
-    labs(x="Position (bp)")+
-    scale_color_grey(start = 0.75, end = 0.75),
+    labs(x="Position (bp)"),
   all_coverage_plt,
   efficiency_plt,
   ncol = 1,
@@ -571,7 +573,8 @@ plt_fig_main <- plot_grid(
 plt_fig_main
 ```
 ```{r}
-save_plot("figures/v2/1_sequence_coverage.pdf", plt_fig_main, ncol = 1,nrow = 3, base_asp = 3, base_height = 3)
+# save_plot("figures/v2/1_sequence_coverage.pdf", plt_fig_main, ncol = 1,nrow = 3, base_asp = 3, base_height = 3)
+save_plot("figures/v2/1_sequence_coverage.pdf", plt_fig_main, base_heigh = 7, base_width = 8)
 ```
 
 
