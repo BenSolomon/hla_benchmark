@@ -1,0 +1,145 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+# scHLA_genotype_import <- function(path, sample){
+#   sample_path <- sprintf("%s/%s_results/labels.tsv", path, sample, sample)
+#   if (file.exists(sample_path)){
+#     suppressMessages(read_tsv(sample_path, col_names = "allele")) %>% 
+#       filter(grepl("\\*", allele)) %>% 
+#       separate(allele, into = "locus", sep = "\\*", extra = "drop", remove = F) %>% 
+#       group_by(locus) %>% 
+#       mutate(allele_id = 1:n()) %>% 
+#       ungroup() %>% 
+#       mutate(genotyper = "scHLAcount") %>% 
+#       select(-locus)
+#   } else {
+#     NULL
+#   }
+# }
+```
+
+
+```{r}
+path <- "/labs/khatrilab/solomonb/covid/isb/scHLAcount/results/211024_180304"
+scHLA_genotype_import(path, "INCOV005-BL")
+```
+```{r}
+isb_path <- "/labs/khatrilab/solomonb/covid/isb"
+isb_samples <- read_tsv("/labs/khatrilab/solomonb/covid/isb/logs/210217_232725/parallel.log") %>% 
+  separate(Command, into = c(NA, "sample"), sep = " ") %>% 
+  pull(sample) %>% unique()
+```
+
+```{r}
+# combine_HLA_import <- function(path, samples, invitro_path="hla_2020-10-23_1457.tsv", filter_invitro = F, expand_invitro = T){
+#   suppressMessages({
+#     if (is.null(invitro_path)){
+#       invitro <- NULL
+#       expand_invitro <- F
+#     } else {
+#       invitro <- invitro_import(path = invitro_path, exclude_comment_samples = filter_invitro)
+#     }
+#     
+#     ### Every subject has molecular HLA typing, but may occur in the BL, AC, or CV timepoint
+#     ### This expands the molecular HLA typing from the timepoint it occurs to all other time points 
+#     ### This allows for scRNA genotyping from a given subject and timepoint to be assessed even if that
+#     ### subjects molecular typing happened at a different time point. Since HLA is genetic, the molecular
+#     ### typing should not change
+#     if (expand_invitro == T){
+#       subjects <- invitro %>% pull(sample) %>% str_replace("-.*$","") %>% unique()
+#       timepoints <- invitro %>% pull(sample) %>% str_replace("^.*-","") %>% unique()
+#       invitro <- expand_grid(sample = subjects, time = timepoints) %>% 
+#         left_join(invitro %>% 
+#                     separate(sample, into = c("sample", NA), sep = "-"),
+#                   by = "sample") %>% 
+#         unite("sample", sample, time, sep = "-")
+#     }
+#     
+#     arcas <- arcas_import(path = sprintf("%s/arcasHLA", path))
+# 
+#     phlat <- tibble(sample = samples) %>%
+#       mutate(data = map(sample, function(x) {
+#         phlat_import(path = sprintf("%s/phlat", path), sample = x)
+#       })) %>%
+#       unnest(data)
+# 
+#     opti <- tibble(sample = samples) %>%
+#       mutate(data = map(sample, function(x) {
+#         optitype_import(path = sprintf("%s/optitype", path), sample = x)
+#       })) %>%
+#       unnest(data)
+# 
+#     miner <- tibble(sample = samples) %>%
+#       mutate(data = map(sample, function(x) {
+#         hlaminer_import(path = sprintf("%s/hla_miner", path), sample = x)
+#       })) %>%
+#       unnest(data)
+#     
+#     schla <- tibble(sample = samples) %>%
+#       mutate(data = map(sample, function(x) {
+#         scHLA_genotype_import(path = sprintf("%s/scHLAcount/results/211024_180304", path), sample = x)
+#       })) %>%
+#       unnest(data) %>% 
+#       mutate_all(as.character)
+# 
+#     bind_rows(arcas, phlat, opti, miner, schla, invitro) %>%
+#       drop_na() %>%
+#       filter(sample %in% samples)
+#   })
+# }
+# 
+all_hla <- combine_HLA_import(path = isb_path, samples = isb_samples)
+all_hla
+```
+
+```{r}
+all_hla <- format_hla_table(all_hla)
+scHLAcount_samples <- all_hla %>% filter(genotyper == "scHLAcount") %>% pull(sample) %>% unique()
+all_hla %>% filter(grepl("BL$", sample)) %>% count(sample, genotyper) %>% pivot_wider(names_from = "genotyper", values_from = "n")
+all_hla %>% filter(grepl("BL$", sample)) %>% count(sample, genotyper) %>% pivot_wider(names_from = "genotyper", values_from = "n") %>% filter(is.na(scHLAcount))
+```
+
+```{r}
+accuracy_df <- compare_hla(
+  hla_df = all_hla, 
+  reference = "invitro", 
+  method = "accuracy",
+  penalize_extra_drb345 = T
+) %>% 
+  filter(
+    grepl("-BL$", sample),
+    !grepl("^DRB[345]", locus))
+```
+
+```{r}
+accuracy_df
+```
+
+
+```{r}
+# Exclude processed samples for scHLAcount
+accuracy_df_filter <- accuracy_df %>% 
+  filter((sample %in% scHLAcount_samples) | (genotyper != "scHLAcount"))
+```
+
+```{r}
+calculate_summary_df(accuracy_df, remove_invalid_combinations = F) %>% 
+  # exclude_genotyper_fields() %>% 
+  gg_summary_hla_accuracy(color_label = "Accuracy")
+```
+
+
+```{r, fig.width = 5, fig.height = 8}
+all_hla %>%
+  allele_tally() %>% 
+  filter((sample %in% scHLAcount_samples) | (genotyper != "scHLAcount")) %>% 
+  filter(genotyper != "invitro") %>% 
+  filter(
+    grepl("-BL$", sample),  # Limit to the BL time point, others addressed in another figure 
+    !grepl("^DRB[345]", locus)) %>%   # DRB345 addressed in another figure
+  gg_hla_prediction_tally()
+```
+
