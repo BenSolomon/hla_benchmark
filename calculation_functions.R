@@ -1,10 +1,7 @@
-library(tidyverse)
-library(tidymodels)
-library(checkmate)
-library(lubridate)
-
-source("data_import_functions.R")
-source("figure_format_functions.R")
+require(tidyverse)
+require(tidymodels)
+require(checkmate)
+require(lubridate)
 
 # Bray-Curtis similarity is ideal metric for matching when ref and comp both have 2 alleles
 # Will be used inside of allele_match, which also has specifications for when n allele != 2
@@ -201,12 +198,12 @@ compare_hla<- function(hla_df,
 
 ### Expects format from accuracy_functions::compare_hla
 ### Summarizes accuracy across locus, field, and genotyper
-calculate_summary_df <- function(df, remove_invalid=T){
+calculate_summary_df <- function(df, var = "accuracy", remove_invalid=T){
   df <- suppressMessages({df %>% 
       group_by(locus, field, genotyper) %>% 
-      summarise(mean_accuracy = mean(accuracy, na.rm = T),
-                sd = sd(accuracy, na.rm=T),
-                se = sd(accuracy, na.rm=T)/sqrt(n()),
+      summarise(mean_accuracy = mean(!!sym(var), na.rm = T),
+                sd = sd(!!sym(var), na.rm=T),
+                se = sd(!!sym(var), na.rm=T)/sqrt(n()),
                 n =) %>% 
       ungroup() %>% 
       mutate(locus = factor(locus, levels = sort(unique(locus), decreasing = T)))
@@ -215,6 +212,51 @@ calculate_summary_df <- function(df, remove_invalid=T){
     df <- df %>% exclude_genotyper_fields()
   }
   return(df)
+}
+
+### Alternative to calculate_summary_df used to find mean of accuracy comparisons
+### Groupss must be held in different columns specified by var_1 and var_2
+### Summarizes accuracy across locus, field, and genotyper and calculates P-values across groups
+### Expects format similar to output of accuracy_functions::compare_hla
+accuracy_difference <- function(df, var_1, var_2, sig_function = "wilcox.test"){
+  sig_function <- get(sig_function)
+  
+  df <- df %>% 
+    ungroup() %>% 
+    mutate(locus = factor(locus, levels = sort(unique(locus), decreasing = T)))
+  
+  # Calculate accuracy and agreement means
+  # Then find difference between variables specified by var_1 and var_2
+  mean_df <- df %>%
+    group_by(locus, field, genotyper) %>%
+    summarise_if(
+      is.numeric, # This should capture "accuracy" and "agreement" columns
+      mean, 
+      na.rm = T) %>%
+    mutate(mean_difference = !!sym(var_1) - !!sym(var_2))
+  
+  # Calculate p-values for paired test of difference between var_1 and var_2
+  # P-values adjusted using FDR based on number of loci for given genotyper-field combo
+  p_df <- df %>%
+    group_by(locus, field, genotyper) %>%
+    nest() %>%
+    mutate(data = map(data, function(df) {
+      tryCatch(
+        suppressWarnings(broom::tidy(sig_function(df[[var_1]], df[[var_2]], paired=T)) %>% dplyr::select(p.value)),
+        error = function(c) NA
+      )
+    })) %>%
+    unnest(data) %>%
+    group_by(field, genotyper) %>%
+    mutate(p_val_adj = round(p.adjust(
+      p.value, method = "fdr", n = n()
+    ), digits = 3))
+  
+  # Join mean values with their respective p-values
+  left_join(mean_df,
+            p_df,
+            by = c("locus", "field", "genotyper")) %>%
+    exclude_genotyper_fields()
 }
 
 

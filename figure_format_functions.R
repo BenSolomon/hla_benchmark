@@ -1,6 +1,5 @@
-library(tidyverse)
-library(flextable)
-
+require(tidyverse)
+require(flextable)
 
 ### Prettifies and orders HLA fields
 reformat_hla_field <- function(field_vector, reverse = F){
@@ -108,7 +107,7 @@ gg_hla_prediction_tally <- function(df, loci = NULL, color = "viridis", reverse 
 ### Expects format from calculation_functions::calculate_summary_df
 ### Creates heatmap of mean accuracy
 ### Colors refer to those within the viridis package
-gg_summary_hla_accuracy <- function(df, color_label = "Accuracy", color = "plasma", reverse = F){
+gg_summary_hla_accuracy <- function(df, fill_var = "mean_accuracy", color_label = "Accuracy", color = "plasma", reverse = F){
   viridis_direction <- ifelse(reverse == T, -1, 1)
   df %>% 
     mutate(field = reformat_hla_field(field)) %>% 
@@ -116,7 +115,7 @@ gg_summary_hla_accuracy <- function(df, color_label = "Accuracy", color = "plasm
     mutate(locus = reformat_hla_loci(locus)) %>% 
     mutate(class = ifelse(grepl("^[ABC]",locus),"mhc1","mhc2")) %>% 
     ggplot(aes(x = genotyper, y = locus)) +
-    geom_tile(aes(fill = mean_accuracy), color = "white")+
+    geom_tile(aes(fill = !!sym(fill_var)), color = "white")+
     # geom_text(aes(label = round(mean_accuracy, digits = 1)))+
     # ggrepel::geom_text_repel(aes(label = round(mean_accuracy, digits = 2)), 
     #                          size = 3.5, 
@@ -135,6 +134,50 @@ gg_summary_hla_accuracy <- function(df, color_label = "Accuracy", color = "plasm
                          direction = viridis_direction) +
     labs(x = "", y = "", fill = color_label)
 }
+
+
+### Extension for calculation_functions::gg_summary_hla_accuracy that plots fill_value based on differences between groups
+### absolute_diff converts fill value to an absolute value for cases where + vs. - isn't meaningful
+### Expects format from calculation_functions::accuracy_difference, which is a wrapper around calculation_functions::calculate_summary_df
+gg_diff_heatmaps <- function(df,
+                             fill_var = "mean_difference", # Which variable to use for fill
+                             p_var = "p_val_adj", # Which variable to use for p-value threshold
+                             limit = 1, # Maximum amplitude of fill scale
+                             p_thresh = 0.05, # P value cut off for annotation asterix 
+                             absolute_diff = F,
+                             color_label = "Accuracy"
+) {
+  # Change fill scale based on absolute value
+  scales <- switch(
+    as.character(absolute_diff),
+    "TRUE" = c(0, limit),
+    "FALSE" = c(-limit, limit)
+  )
+  # Change color palette based on absolute value
+  pal <- switch(
+    as.character(absolute_diff),
+    "TRUE" = viridis_pal()(11),
+    "FALSE" = RColorBrewer::brewer.pal(11, "BrBG")
+  )
+  # Convert fill_var based on absolute value
+  if (absolute_diff){
+    df <- df %>% 
+      mutate(fill_var = abs(!!sym(fill_var)))
+  }
+  
+  plt <- gg_summary_hla_accuracy(df, fill_var = fill_var, color_label = color_label) +
+    scale_fill_gradientn(
+      colors = pal,
+      na.value = "transparent",
+      limits = scales,
+      oob = squish
+    ) +
+    geom_point(data = . %>% filter(!!sym(p_var) <= p_thresh),
+               shape = 8)
+  plt$layers[[1]]$aes_params$colour <- "black"
+  return(plt)
+}
+
 
 ### Expects format from calculation_functions::calculate_summary_df
 ### Creates a table of mean accuracy and standard error
@@ -204,6 +247,7 @@ gg_allele_hla_accuracy <- function(df, color_label = "Accuracy", field_selection
       theme(axis.text.x = element_text(angle= 45, hjust = 1))
   })
 }
+
 
 gg_individual_hla_accuracy <- function(df, color_label = "Accuracy", field_selection = "field_2", color = "plasma"){
   suppressMessages({
