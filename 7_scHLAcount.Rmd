@@ -300,10 +300,28 @@ plt_allele_freq
 
 ```{r, fig.width = 12, fig.height = 3, warning = F, message = F}
 # samp <- "INCOV069-BL"
-samp <- "INCOV022-BL"
-# samp <- "INCOV028-BL"
+# samp <- "INCOV022-BL"
+samp <- "INCOV028-BL"
 # samp <- "INCOV083-BL"
 scHLAcount_dir <- sprintf("%s/scHLAcount", isb_path)
+
+# Create tibble of all genotyper and sample combinations
+allele_data <- expand_grid(
+  genotyper = c("invitro", "arcasHLA", "optitype", "phlat", "hlaminer"),
+  sample = read_lines(
+    "/labs/khatrilab/solomonb/covid/isb/scHLAcount/BL_fastq_files.txt"
+  )) %>% 
+  filter(grepl(samp, sample)) %>% 
+  # Import data based on sample and genotyper
+  mutate(result_path = sprintf("%s/output/%s",scHLAcount_dir, genotyper),
+         barcode_path = sprintf("%s/barcodes", scHLAcount_dir)) %>% 
+  mutate(data = pmap(list(sample, result_path, barcode_path), function(s,r,b){
+    df <- scHLA_data_processing(
+      sample=s,
+      result_dir=r,
+      barcode_dir=b
+    ) 
+  })) %>% unnest(data)
 
 # Create tibble of all genotyper and sample combinations
 allele_max_ratio <- allele_data  %>%
@@ -448,8 +466,10 @@ meta_df
 ```
 ```{r}
 # Single celltype and gene
-samp <- "INCOV069-BL"
+# samp <- "INCOV069-BL"
 # samp <- "INCOV022-BL"
+samp <- "INCOV028-BL"
+# samp <- "INCOV083-BL"
 plt_meta <- meta_df %>% 
   filter(sample == samp) %>% 
   filter(celltype == "NK", gene == "A") %>% 
@@ -593,6 +613,7 @@ for (i in c(0,1)){
 
 ```{r, warning = F}
 corr_df <- meta_df %>% 
+  mutate(genotyper = reformat_hla_genotyper(genotyper)) %>% 
   select(sample, genotyper, celltype, gene, TE) %>% 
   pivot_wider(names_from = "genotyper", values_from = "TE") %>% 
   pivot_longer(c(arcasHLA, HLAminer, OptiType, PHLAT), names_to = "genotyper", values_to = "TE") %>% 
@@ -629,15 +650,22 @@ for (i in c(0,1)){
 ```{r}
 plt_meta_corr_abbrev <- corr_df %>% 
   left_join(accuracy_df, by = c("sample", "gene", "genotyper")) %>% 
-  filter(gene == "A", accuracy %in% c(0,1)) %>% 
+  filter(gene == "A", accuracy %in% c(0,0.5,1)) %>%
   ggplot(aes(x=`Ground truth`, y=TE))+
     geom_point(size = 0.5)+
     facet_grid(accuracy ~ genotyper, labeller = labeller(accuracy = function(x) sprintf("Accuracy: %s", x))) +
     theme_bw() +
-    ggpubr::stat_cor(aes(label = ..rr.label..), label.x.npc = "left", label.y.npc = "top", geom = "label") +
+    ggpubr::stat_cor(aes(label = ..rr.label..), label.x.npc = "left", label.y.npc = "top", geom = "label", method = "pearson") +
     labs(y = "Log-odds ratio using predicted genotype", x = "Log-odds ratio using ground truth genotyper")
 plt_meta_corr_abbrev
 ```
+```{r}
+accuracy_df %>% 
+  ungroup() %>% 
+  drop_na() %>% 
+  count(gene, genotyper, accuracy)
+```
+
 
 
 ### By severity
@@ -743,7 +771,7 @@ col_2 <- plot_grid(
   label_x = -0.05
 )
 
-plot_grid(
+plt_fig_main <- plot_grid(
   NULL,
   col_1,
   col_2,
@@ -751,7 +779,28 @@ plot_grid(
   rel_widths = c(0.25,3,6)
 )
 
+plt_fig_main
+```
+```{r}
+save_plot("figures_pdf/v2/7_scHLA.pdf", plt_fig_main, base_height = 7, base_width = 14)
+```
 
+# Save all figure objects 
+```{r}
+listN <- function(...) {
+  anonList <- list(...)
+  names(anonList) <- as.character(substitute(list(...)))[-1]
+  anonList
+}
+
+saveRDS(
+  listN(plt_srt,
+        plt_meta,
+        plt_max_allele,
+        plt_meta_corr_abbrev
+        ),
+  "figures_object/7_scHLA_objects.RDS"
+)
 ```
 
 # Old work
