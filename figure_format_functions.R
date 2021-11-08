@@ -406,7 +406,8 @@ gg_coverage <- function(df,
     mutate(genotyper = reformat_hla_genotyper(genotyper)) %>% # Reformat genotyper names
     filter_at(y_var, function(x) !is.na(x)) %>% 
     mutate(n_alleles = factor(n_alleles, levels = 0:2)) %>% 
-    remove_invalid_combinations()
+    exclude_genotyper_fields()
+    # remove_invalid_combinations()
   # ## Remove genotypers not valid for a given genotyper:locus:field combo
   # if (y_var=="accuracy"){
   #   df <- remove_invalid_combinations(df)}
