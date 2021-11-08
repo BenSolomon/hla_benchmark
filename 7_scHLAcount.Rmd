@@ -781,9 +781,51 @@ plt_fig_main <- plot_grid(
 
 plt_fig_main
 ```
-```{r}
-save_plot("figures_pdf/v2/7_scHLA.pdf", plt_fig_main, base_height = 7, base_width = 14)
+
+```{r, fig.width = 14, fig.height = 5}
+col_1 <- plot_grid(
+  plt_srt,
+  plt_meta+ labs(y="Log-odds ratio\nof dominant allele"),
+  ncol = 1,
+  align = "v", axis = "lr",
+  labels = LETTERS[c(1,3)],
+  label_x = -0.05
+)
+
+col_2 <- plot_grid(
+  plt_max_allele,
+  plt_meta_corr_abbrev + facet_grid(. ~ genotyper) + labs(y="Log-odds ratio using\npredicted genotype"),
+  ncol = 1,
+  rel_heights = c(1,1),
+  align = "v", axis = "lr",
+  labels = LETTERS[c(2,4)],
+  label_x = -0.05
+)
+
+plt_fig_main <- plot_grid(
+  NULL,
+  col_1,
+  NULL,
+  col_2,
+  nrow = 1,
+  rel_widths = c(0.25,3,0.25,6)
+)
+
+plt_fig_main
 ```
+
+```{r}
+save_plot("figures_pdf/v2/7_scHLA.pdf", plt_fig_main, base_height = 5, base_width = 14)
+```
+
+```{r, fig.width = 6, fig.height=5}
+plt_fig_supp <- plt_meta_corr_abbrev + facet_grid(accuracy ~ genotyper, margins = "accuracy") 
+plt_fig_supp
+```
+```{r}
+save_plot("figures_pdf/v2/s6_scHLA.pdf", plt_fig_supp, base_height = 5, base_width = 6)
+```
+
 
 # Save all figure objects 
 ```{r}
