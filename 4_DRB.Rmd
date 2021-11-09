@@ -114,7 +114,11 @@ drb345_df %>%
   geom_density(alpha = 0.1) +
   theme_bw() +
   scale_fill_brewer(palette = "Set1") + scale_color_brewer(palette = "Set1") +
-  facet_grid(copy_number ~ locus, scales = "free")
+  facet_grid(copy_number ~ locus, scales = "free") +
+  labs(x = "DRB345 / DRB1 ratio", y = "Density")
+
+drb345_ratio_plt_5p <- gg_drb345_ratio(drb345_df_5p)
+drb345_ratio_plt_5p
 ```
 ### KNN model
 
@@ -542,6 +546,30 @@ saveRDS(
 )
 
 ```
+
+# Supplemental figure
+
+```{r}
+fig6_objects <- readRDS("figures_object/6_platforms.RDS")
+```
+```{r, fig.width = 8, fig.height = 9}
+plt_fig_supp <- plot_grid(
+  drb345_ratio_plt_5p,
+  testing_plt,
+  fig6_objects$drb345_ratio_plt_3p,
+  fig6_objects$drb345_ROC_3p,
+  fig6_objects$drb345_ratio_plt_bulk,
+  fig6_objects$drb345_ROC_bulk,
+  ncol = 2,
+  rel_widths = c(0.9,1),
+  labels = LETTERS[1:6]
+)
+plt_fig_supp
+```
+```{r}
+save_plot("figures_pdf/v2/s3_deb.pdf", plt_fig_supp, base_height = 9, base_width = 8)
+```
+
 
 # Old work
 

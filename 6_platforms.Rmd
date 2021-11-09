@@ -56,7 +56,7 @@ pmid_bulk_samples <- sample_metadata %>% filter(platform == "bulkRNA") %>% pull(
 ### 3'
 ```{r}
 pmid_3p_hla <- combine_HLA_import(
-  path = "/labs/khatrilab/solomonb/covid/pmid30518681/scRNA/",
+  path = "/labs/khatrilab/solomonb/covid/pmid30518681/scRNA",
   samples = pmid_3p_srr,
   invitro_path = NULL) %>%  # Will manually add invitro
   rename(Run = sample) %>% 
@@ -148,7 +148,7 @@ drb345_3p_auc <- drb345_3p_predicted %>%
   round(.,3)
 drb345_ROC_3p <- gg_multilevel_roc(drb345_3p_predicted) +
   geom_label(aes(label = sprintf("AUC: %s", drb345_3p_auc), x=0.8, y=0.05, color = NULL), color = "black", size = 3)
-
+drb345_ROC_3p
 
 # None of the bulk RNA samples have 2 alleles for a single DRB345. 
 # ROC will fail to generate without all possible allele counts {0,1,2} in ground truth
@@ -251,11 +251,11 @@ all_hla_drb345_bulk_filtered <- filter_drb_in_all_hla(drb_predictions = drb345_b
                                                       all_hla_df = pmid_bulk_hla, 
                                                       samples = pmid_bulk_samples)
 
-# saveRDS(all_hla_drb345_3p_filtered, "all_hla_drb345_filtered_pmid_scRNA.RDS")
-# saveRDS(all_hla_drb345_bulk_filtered, "all_hla_drb345_filtered_pmid_bulkRNA.RDS")
+# saveRDS(all_hla_drb345_3p_filtered, "data/all_hla_drb345_filtered_pmid_scRNA.RDS")
+# saveRDS(all_hla_drb345_bulk_filtered, "data/all_hla_drb345_filtered_pmid_bulkRNA.RDS")
 
-# all_hla_drb345_3p_filtered <- readRDS("all_hla_drb345_filtered_pmid_scRNA.RDS")
-# all_hla_drb345_bulk_filtered <- readRDS("all_hla_drb345_filtered_pmid_bulkRNA.RDS")
+# all_hla_drb345_3p_filtered <- readRDS("data/all_hla_drb345_filtered_pmid_scRNA.RDS")
+# all_hla_drb345_bulk_filtered <- readRDS("data/all_hla_drb345_filtered_pmid_bulkRNA.RDS")
 ```
 
 # Plots and tables
@@ -333,6 +333,16 @@ plot_grid(
   nrow=1
 )
 ```
+```{r,fig.height = 3, fig.width = 8}
+plt_fig_supp <- plot_grid(accuracy_3p_plt,
+          accuracy_bulk_plt,
+          nrow = 1,
+          labels = LETTERS[1:2])
+plt_fig_supp
+```
+```{r}
+save_plot("figures_pdf/v2/s1_platforms.pdf", plt_fig_supp, base_height = 3, base_width = 8)
+```
 
 ### Success tables
 ```{r}
@@ -362,6 +372,32 @@ calculate_summary_df(accuracy_bulk_df) %>%
   flex_summary_hla_accuracy() %>% 
   fontsize(size = 8, part = "all") %>% 
   print(preview = "pptx")
+```
+
+# Save all figure objects 
+```{r}
+listN <- function(...){
+    anonList <- list(...)
+    names(anonList) <- as.character(substitute(list(...)))[-1]
+    anonList
+}
+
+saveRDS(
+  listN(
+    drb345_ROC_3p,
+    drb345_ratio_plt_3p,
+    drb345_ROC_bulk,
+    drb345_ratio_plt_bulk,
+    success_3p_plt,
+    accuracy_3p_plt,
+    prediction_tally_3p_plt,
+    success_bulk_plt,
+    accuracy_bulk_plt,
+    prediction_tally_bulk_plt
+  ),
+  "figures_object/6_platforms.RDS"
+)
+
 ```
 
 # OLD WORK
