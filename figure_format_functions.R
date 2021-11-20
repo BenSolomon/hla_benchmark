@@ -78,6 +78,23 @@ exclude_genotyper_fields <- function(df){
     )
 }
 
+### Add to the end of a ggplot to adjust parameters of legend size
+### E.g. ggplot(...) + adjust_legend_size(...)
+adjust_legend_size <- function(
+  pointSize = 1,
+  titleSize = 12,
+  textSize = 8,
+  spaceLegend = 1){
+  list(
+    guides(shape = guide_legend(override.aes = list(size = pointSize)),
+           color = guide_legend(override.aes = list(size = pointSize))),
+    theme(
+      legend.title = element_text(size = titleSize),
+      legend.text  = element_text(size = textSize),
+      legend.key.size = unit(spaceLegend, "lines")
+    )
+  )
+}
 
 ### Expects format from calculation_functions::allele_tally
 ### Plots relative proportion of 0,1,2 allele predictions across all samples as a bar chart

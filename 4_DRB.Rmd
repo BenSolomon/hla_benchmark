@@ -346,9 +346,15 @@ drb345_filtered_accuracy <- bind_rows(
 ) %>% 
   calculate_drb345_accuracy(match_drb345_na = score_absent) 
 
+# saveRDS(drb345_filtered_accuracy, "data/drb345_filtered_accuracy.RDS")
+# drb345_filtered_accuracy <- readRDS("data/drb345_filtered_accuracy.RDS")
+
 drb345_unfiltered_accuracy <- all_hla %>% 
     filter(grepl("^DRB[345]", locus)) %>% 
     calculate_drb345_accuracy(match_drb345_na = score_absent) 
+
+# saveRDS(drb345_unfiltered_accuracy, "data/drb345_unfiltered_accuracy.RDS")
+# drb345_unfiltered_accuracy <- readRDS("data/drb345_unfiltered_accuracy.RDS")
 
 drb345_accuracy_comparison <- bind_rows(
   drb345_filtered_accuracy %>% 
@@ -363,6 +369,10 @@ drb345_accuracy_comparison <- bind_rows(
            genotyper = "Unfiltered"),
 )
 
+# saveRDS(drb345_accuracy_comparison, "data/drb345_accuracy_comparison.RDS")
+# drb345_accuracy_comparison <- readRDS("data/drb345_accuracy_comparison.RDS")
+```
+```{R, fig.width = 4, fig.height = 3}
 drb345_accuracy_plt <- drb345_accuracy_comparison %>% 
   mutate(genotyper = fct_relevel(genotyper, "Unfiltered", "Filtered")) %>% 
   gg_summary_hla_accuracy(color_label = "Accuracy") + 
@@ -370,6 +380,29 @@ drb345_accuracy_plt <- drb345_accuracy_comparison %>%
   theme(strip.text.y = element_text(angle = 270))
 
 drb345_accuracy_plt
+```
+```{R, fig.width = 4, fig.height = 2.5}
+drb345_difference_df <- bind_rows(
+  drb345_filtered_accuracy %>% mutate(filter = "filtered"),
+  drb345_unfiltered_accuracy %>% mutate(filter = "unfiltered")
+) %>%
+  dplyr::select(-reference, -allele) %>%
+  pivot_wider(names_from = "filter", values_from = "accuracy") %>%
+  accuracy_difference(var_1 = "filtered",
+                      var_2 = "unfiltered",
+                      sig_function = "wilcox.test")
+
+# saveRDS(drb345_difference_df, "data/drb345_difference_df.RDS")
+# drb345_difference_df <- readRDS("data/drb345_difference_df.RDS")
+
+drb345_difference_plt <- drb345_difference_df %>% 
+  mutate(genotyper_2 = genotyper, genotyper = reformat_hla_field(field)) %>% 
+  gg_diff_heatmaps(color_label = "Filtered -\nunfiltered\naccuracy") +
+  facet_grid(genotyper_2 ~ field, scales = "free_x") +
+  theme(strip.text.y = element_text(angle = 270),
+        strip.text.x = element_blank()) 
+  
+drb345_difference_plt
 ```
 
 ```{r}
@@ -401,7 +434,7 @@ df_key <- suppressWarnings({tibble(col_keys = names(drb345_table)) %>%
     separate(col_keys, into = c("field", "genotyper"), sep = "-", remove = F) %>%
     separate(genotyper, into = c("genotyper", "filter"), sep = " ") %>% 
     drop_na()})
-drb345_table %>% 
+drb345_flextable <- drb345_table %>% 
   flextable() %>% 
   colformat_char(na_str = "---") %>% 
   set_header_df(mapping = df_key, key = "col_keys") %>% 
@@ -411,8 +444,10 @@ drb345_table %>%
   # vline(j=c(3,7,11), border = fp_border_default()) 
   vline(j=seq(1,12, by = 2), border = fp_border_default()) %>% 
   fix_border_issues() %>% 
-  fontsize(size = 8, part = "all") %>% 
-  print(preview = "pptx")
+  fontsize(size = 8, part = "all") 
+
+saveRDS(drb345_flextable, "tables/drb345_flextable.RDS")
+print(drb345_flextable)
 ```
 ```{r}
 calculate_summary_df(drb345_accuracy_comparison) %>% 
@@ -421,6 +456,9 @@ calculate_summary_df(drb345_accuracy_comparison) %>%
   print(preview = "pptx")
 ```
 
+```{r}
+
+```
 
 
 ```{r}
@@ -477,23 +515,29 @@ plt_fig_main <- plot_grid(
 )
 plt_fig_main
 ```
+
+
+
 ```{r, fig.width = 8, fig.height = 6}
 plt_fig_main <- plot_grid(
   plot_grid(
-    testing_plt, drb345_similarity_plt,
-    ncol = 1,
-    align = "v",
-    axis = "lr",
-    labels = c("A","C")
+    testing_plt, allele_contingency_plt,
+    nrow = 1,
+    align = "h",
+    axis = "tb",
+    labels = c("A","B")
   ),
   plot_grid(
-    allele_contingency_plt, drb345_accuracy_plt,
-    ncol = 1,
-    align = "v",
-    axis = "lr",
-    labels = c("B","D")
+    drb345_similarity_plt, 
+    drb345_accuracy_plt + adjust_legend_size(titleSize = 10, textSize = 8, spaceLegend = 1), 
+    drb345_difference_plt + adjust_legend_size(titleSize = 10, textSize = 8, spaceLegend = 1),
+    nrow = 1,
+    align = "h",
+    axis = "tb",
+    labels = c("C","D", "E"),
+    rel_widths = c(0.7,1,0.8)
   ),
-  nrow = 1
+  ncol = 1
 )
 plt_fig_main
 ```
