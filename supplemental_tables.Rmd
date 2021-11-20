@@ -6,6 +6,7 @@ classoption: landscape
 
 ```{r, echo = F}
 library(flextable)
+library(dplyr)
 ```
 
 
@@ -54,6 +55,13 @@ set_table_properties(drb345_flextable, layout = "autofit")
 |       **Supplemental Table X - *HLA-DRB345* accuracy**
 |       Accuracy of *HLA-DRB345* genotypes filtered or unfiltered by KNN copy number classifier. Values represent mean accuracy +/- SEM
 
-
+\newpage
+# Composite point accuracy
+```{r, echo = F, warning = F}
+composite_accuracy_flextable <- readRDS("tables/composite_accuracy_flextable.RDS")
+composite_accuracy_flextable %>% 
+fontsize(size = 8, part = "all") %>% 
+set_table_properties(layout = "autofit") 
+```
 
 

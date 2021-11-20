@@ -256,27 +256,13 @@ save_plot("figures_pdf/v2/s5cd_composite.pdf", plt_fig_supp, base_height = 7, ba
 # Tables
 
 ```{r}
-composite_accuracy_df %>% 
-  calculate_summary_df() %>% 
+composite_accuracy_flextable <- 
+  bind_rows(
+    averaged_composite_accuracy %>% calculate_summary_df(),
+      composite_accuracy_df %>% calculate_summary_df()
+  )  %>% 
   flex_summary_hla_accuracy() %>%
-  fontsize(size = 8, part = "all") %>%
-  print(preview = "pptx")
+  fontsize(size = 8, part = "all") 
+saveRDS(composite_accuracy_flextable, "tables/composite_accuracy_flextable.RDS")
+print(composite_accuracy_flextable)
 ```
-
-```{r}
-averaged_composite_accuracy %>% 
-  calculate_summary_df() %>% 
-  flex_summary_hla_accuracy() %>%
-  fontsize(size = 8, part = "all") %>%
-  print(preview = "pptx")
-```
-
-
-
-
-
-
-
-
-
-
