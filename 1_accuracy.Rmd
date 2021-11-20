@@ -119,18 +119,22 @@ save_plot("figures/v2/2_accuracy.pdf", plt_fig_main, ncol = 2,nrow = 2, base_asp
 # Accuracy table
 
 ```{r, fig.width = 12}
-calculate_summary_df(accuracy_df) %>% 
+p5_accuracy_flextable <- calculate_summary_df(accuracy_df) %>% 
   flex_summary_hla_accuracy() %>% 
-  fontsize(size = 8, part = "all") %>% 
-  print(preview = "pptx")
+  fontsize(size = 8, part = "all") 
+
+saveRDS(p5_accuracy_flextable, "tables/p5_accuracy_flextable.RDS")
+print(p5_accuracy_flextable)
 ```
 
 # Success table
 ```{r}
-calculate_summary_df(success_df) %>% 
+p5_success_flextable <- calculate_summary_df(success_df) %>% 
   flex_summary_hla_accuracy() %>% 
-  fontsize(size = 8, part = "all") %>% 
-  print(preview = "pptx")
+  fontsize(size = 8, part = "all") 
+
+saveRDS(p5_success_flextable, "tables/p5_success_flextable.RDS")
+print(p5_success_flextable)
 ```
 
 # Supplemental figure
