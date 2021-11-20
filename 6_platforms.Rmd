@@ -344,34 +344,22 @@ plt_fig_supp
 save_plot("figures_pdf/v2/s1_platforms.pdf", plt_fig_supp, base_height = 3, base_width = 8)
 ```
 
-### Success tables
-```{r}
-calculate_summary_df(success_3p_df) %>% 
-  flex_summary_hla_accuracy() %>% 
-  fontsize(size = 8, part = "all") %>% 
-  print(preview = "pptx")
-```
-
-```{r}
-calculate_summary_df(success_bulk_df) %>% 
-  flex_summary_hla_accuracy() %>% 
-  fontsize(size = 8, part = "all") %>% 
-  print(preview = "pptx")
-```
-
 ### Accuracy tables
+
 ```{r}
-calculate_summary_df(accuracy_3p_df) %>% 
+p3_accuracy_flextable <- calculate_summary_df(accuracy_3p_df) %>% 
   flex_summary_hla_accuracy() %>% 
-  fontsize(size = 8, part = "all") %>% 
-  print(preview = "pptx")
+  fontsize(size = 8, part = "all")
+saveRDS(p3_accuracy_flextable, "tables/p3_accuracy_flextable.RDS")
+print(p3_accuracy_flextable)
 ```
 
 ```{r}
-calculate_summary_df(accuracy_bulk_df) %>% 
+bulk_accuracy_flextable <- calculate_summary_df(accuracy_bulk_df) %>% 
   flex_summary_hla_accuracy() %>% 
-  fontsize(size = 8, part = "all") %>% 
-  print(preview = "pptx")
+  fontsize(size = 8, part = "all") 
+saveRDS(bulk_accuracy_flextable, "tables/bulk_accuracy_flextable.RDS")
+print(bulk_accuracy_flextable)
 ```
 
 # Save all figure objects 
