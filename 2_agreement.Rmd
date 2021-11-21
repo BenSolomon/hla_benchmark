@@ -47,6 +47,8 @@ agreement_df <- accuracy_df %>%
   mutate(expected_agreement = coalesce(expected_agreement, 0)) %>% 
   exclude_genotyper_fields() 
 
+# saveRDS(agreement_df, "data/agreement_df.RDS")
+# agreement_df <-  readRDS("data/agreement_df.RDS")
 ```
 
 ### Time point accuracy
@@ -132,6 +134,12 @@ saveRDS(
 )
 ```
 
+# Tables
+
+```{r}
+agreement_df %>% calculate_summary_df(var = "accuracy_AC")
+agreement_df %>% calculate_summary_df(var = "accuracy_BL")
+```
 
 # Earlier analysis
 
