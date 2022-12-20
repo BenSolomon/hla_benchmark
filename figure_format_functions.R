@@ -361,7 +361,8 @@ gg_runtime <- function(df, include_tasks = NULL){
   arg_col <- makeAssertCollection()
   possible_tasks <- c(
     "FASTQ-COMPILE", "PRE-FASTQC", "TRIM", "POST-FASTQC", "HISAT-AND-SORT",
-    "INDEX", "ARCAS-EXTRACT", "ARCAS-GENOTYPE", "PHLAT", "OPTITYPE","HLAMINER"
+    "INDEX", "ARCAS-EXTRACT", "ARCAS-GENOTYPE", "PHLAT", "OPTITYPE","HLAMINER",
+    "ArcasHLA", "OptiType", "AO", "AOP"
   )
   df_columns <- c("sample", "component", "process_time")
   assertNames(include_tasks, subset.of = possible_tasks, .var.name = "possible tasks", add = arg_col)
@@ -375,7 +376,8 @@ gg_runtime <- function(df, include_tasks = NULL){
     filter(component %in% include_tasks)  %>%
     mutate(component = factor(component, levels = c(
       "FASTQ-COMPILE", "PRE-FASTQC", "TRIM", "POST-FASTQC", "HISAT-AND-SORT",
-      "INDEX", "ARCAS-EXTRACT", "ARCAS-GENOTYPE", "OPTITYPE","PHLAT","HLAMINER"
+      "INDEX", "ARCAS-EXTRACT", "ARCAS-GENOTYPE", "ArcasHLA", "OPTITYPE", "OptiType", "PHLAT","HLAMINER",
+      "AO", "AOP"
     ))) %>%
     drop_na() %>%
     ggplot(aes(x = component, y = process_time))+

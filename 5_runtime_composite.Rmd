@@ -41,7 +41,19 @@ time_df <- expand_grid(sample = isb_samples,
   mutate(data = map(log_path, parse_log_time)) %>% 
   unnest(data)
 
+# saveRDS(time_df, "data/time_df.RDS")
+```
+
+```{r}
+time_df <- readRDS("data/time_df.RDS")
 time_df
+```
+
+
+```{r}
+gg_runtime(time_df)$data %>% 
+  group_by(component) %>% 
+  summarise(median_time = median(process_time)*60)
 ```
 
 ```{r}
@@ -50,6 +62,43 @@ runtime_plt <- time_df %>%
   scale_y_sqrt()
 runtime_plt
 ```
+### Composite runtime
+
+```{r}
+time_df %>% 
+  select(sample, component, process_time) %>% 
+  pivot_wider(names_from = "component", values_from = "process_time") %>% 
+  mutate(PRE_PROCESS = `HISAT-AND-SORT` + `ARCAS-EXTRACT` + `INDEX`,
+         AO = PRE_PROCESS + `ARCAS-GENOTYPE` + OPTITYPE,
+         AOP = PRE_PROCESS + `ARCAS-GENOTYPE` + OPTITYPE + PHLAT,
+         ArcasHLA = PRE_PROCESS + `ARCAS-GENOTYPE`,
+         OptiType = PRE_PROCESS + `OPTITYPE`,
+         PHLAT = PRE_PROCESS + `PHLAT`) %>% 
+  select(sample, ArcasHLA, OptiType, PHLAT, AO, AOP) %>% 
+  pivot_longer(-sample, names_to = "component", values_to = "process_time") %>% 
+  group_by(component) %>% 
+  summarise(median_time = median(process_time)*60)
+
+```
+
+```{r, fig.width=6, fig.height=4}
+time_df %>% 
+  select(sample, component, process_time) %>% 
+  pivot_wider(names_from = "component", values_from = "process_time") %>% 
+  mutate(PRE_PROCESS = `HISAT-AND-SORT` + `ARCAS-EXTRACT` + `INDEX`,
+         AO = PRE_PROCESS + `ARCAS-GENOTYPE` + OPTITYPE,
+         AOP = PRE_PROCESS + `ARCAS-GENOTYPE` + OPTITYPE + PHLAT,
+         ArcasHLA = PRE_PROCESS + `ARCAS-GENOTYPE`,
+         OptiType = PRE_PROCESS + `OPTITYPE`,
+         PHLAT = PRE_PROCESS + `PHLAT`) %>% 
+  select(sample, ArcasHLA, OptiType, PHLAT, AO, AOP) %>% 
+  pivot_longer(-sample, names_to = "component", values_to = "process_time") %>% 
+  gg_runtime(include_tasks = c("ArcasHLA", "OptiType", "PHLAT", "AO", "AOP"))
+# +
+  # scale_y_sqrt()
+```
+
+
 # Composite genotyper
 
 ### With PHLAT
