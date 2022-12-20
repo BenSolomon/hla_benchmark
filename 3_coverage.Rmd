@@ -175,6 +175,8 @@ subsample_reads_combined_df <- subsample_reads_accuracy_df %>%
   mutate(coverage = (reads * 91)/bp) %>%  # Calculate coverage
   mutate(n_alleles = map_dbl(allele, function(x) sum(!is.na(x)))) %>%  # Calculate n_alleles
   filter(grepl("^[ABC]|D.[AB]1", locus) & grepl("-(AC|BL)", sample) & genotyper != "hlaminer") 
+# saveRDS(subsample_reads_combined_df, "subsample_reads_combined_df.RDS")
+# subsample_reads_combined_df <- readRDS("subsample_reads_combined_df.RDS")
 ```
 
 ### Reads plots
@@ -272,6 +274,7 @@ subsample_cells_accuracy_df <- compare_hla(
   method = "accuracy"
 )
 # saveRDS(subsample_cells_accuracy_df, "isb_subsample_cells_accuracy.RDS")
+# subsample_cells_accuracy_df <- readRDS("isb_subsample_cells_accuracy.RDS")
 ```
 
 ```{r}
@@ -285,6 +288,7 @@ subsample_cells_success_df <- compare_hla(
   method = "success"
 )
 # saveRDS(subsample_cells_success_df, "isb_subsample_cells_success.RDS")
+subsample_cells_success_df <- readRDS("isb_subsample_cells_success.RDS")
 ```
 
 ```{r}
@@ -302,6 +306,7 @@ subsample_cells_combined_df <- subsample_cells_accuracy_df %>%
   mutate(coverage = (reads * 91)/bp) %>% 
   mutate(n_alleles = map_dbl(allele, function(x) sum(!is.na(x)))) %>% 
   filter(grepl("^[ABC]|D.[AB]1", locus) & grepl("-(AC|BL)", sample) & genotyper != "hlaminer") 
+saveRDS(subsample_cells_combined_df, "subsample_cells_combined_df.RDS")
 ```
 
 ### Coverage plots
@@ -420,6 +425,50 @@ plot_grid(
 )
 ```
 
+### Main plot
+
+```{r}
+loci <- c("A", "B", "C", "DPB1", "DQA1", "DRB1")
+plt_read_accuracy_subset <- gg_coverage(
+  subsample_reads_combined_df %>% 
+    filter(locus %in% loci) %>% 
+    filter(!(genotyper == "phlat" & locus == "DPB1")) %>% 
+    filter(!(genotyper == "optitype" & locus == "DPB1")) %>% 
+    filter(!(genotyper == "optitype" & locus == "DQA1")) %>% 
+    filter(!(genotyper == "optitype" & locus == "DRB1")), 
+  x_var = "reads", y_var = "accuracy") +
+  facet_wrap(~locus, nrow = 2)
+plt_read_accuracy_subset
+```
+```{r}
+save_plot("figures_pdf/v2/5_coverage.pdf", plt_read_accuracy_subset, base_height = 4, base_width = 6)
+```
+
+```{r}
+plt_read_allele_all <- gg_coverage(subsample_reads_combined_df %>% 
+    filter(locus %in% loci) %>% 
+    filter(!(genotyper == "phlat" & locus == "DPB1")) %>% 
+    filter(!(genotyper == "optitype" & locus == "DPB1")) %>% 
+    filter(!(genotyper == "optitype" & locus == "DQA1")) %>% 
+    filter(!(genotyper == "optitype" & locus == "DRB1")), x_var = "reads", y_var = "n_alleles", facet_genotyper = T)
+plt_read_allele_all
+```
+```{r, fig.width = 7, fig.height=7}
+plt_main <- plot_grid(
+  plt_read_accuracy_subset,
+  plt_read_allele_all,
+  ncol = 1,
+  rel_heights = c(3,2),
+  align = "v",
+  axis = "lr",
+  labels = c("A", "B")
+)
+plt_main
+```
+```{r}
+save_plot("figures_pdf/v2/5_coverage.pdf", plt_main, base_height = 7, base_width = 7)
+```
+
 # Slope stats
 
 ```{r}
@@ -435,7 +484,7 @@ get_lm_stats <- function(df, x_var = "coverage", y_var = "accuracy", field_var =
   # browser()
   df <- df %>% 
     filter(field == field_var) %>% 
-    remove_invalid_combinations()
+    exclude_genotyper_fields() # Replace w/ exclude_genotyper_fields?
   if (x_log ==T){df <- df %>% mutate_at(x_var, log10)}
   df %>%
   filter_at(x_var, function(x) !is.na(x) & !is.infinite(x)) %>% 

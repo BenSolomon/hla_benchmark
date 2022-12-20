@@ -122,10 +122,10 @@ hlaminer_import <- function(path, sample){
 
 
 ### scHLAcount genotype import
-schlacountGenotype_import <- function(path, sample){
-  sample_path <- sprintf("%s/%s_results/labels.tsv", path, sample)
+scHLA_genotype_import <- function(path, sample){
+  sample_path <- sprintf("%s/%s_results/labels.tsv", path, sample, sample)
   if (file.exists(sample_path)){
-    suppressWarnings(read_tsv(sample_path, col_names = "allele")) %>% 
+    suppressMessages(read_tsv(sample_path, col_names = "allele")) %>% 
       filter(grepl("\\*", allele)) %>% 
       separate(allele, into = "locus", sep = "\\*", extra = "drop", remove = F) %>% 
       group_by(locus) %>% 
@@ -138,12 +138,25 @@ schlacountGenotype_import <- function(path, sample){
   }
 }
 # schla_path <- "/labs/khatrilab/solomonb/covid/isb/scHLAcount/scHLAcount_genotyping/consolidated_output"
-# schlacountGenotype_import(schla_path, "INCOV003-BL_S5")
+# scHLA_genotype_import(schla_path, "INCOV003-BL_S5")
 
 
 
 ### Combined import function
-combine_HLA_import <- function(path, samples, invitro_path="hla_2020-10-23_1457.tsv", filter_invitro = F, expand_invitro = T){
+# path - base path
+# *_subdir - subdirectory of each genotyper within path
+combine_HLA_import <- function(
+    path, 
+    samples, 
+    invitro_path="hla_2020-10-23_1457.tsv", 
+    filter_invitro = F, 
+    expand_invitro = T,
+    arcas_subdir = "arcasHLA",
+    phlat_subdir = "phlat",
+    opti_subdir = "optitype",
+    miner_subdir = "hla_miner",
+    schla_subdir = "scHLAcount/results/211024_180304"
+  ){
   suppressMessages({
     if (is.null(invitro_path)){
       invitro <- NULL
@@ -167,28 +180,35 @@ combine_HLA_import <- function(path, samples, invitro_path="hla_2020-10-23_1457.
         unite("sample", sample, time, sep = "-")
     }
     
-    arcas <- arcas_import(path = sprintf("%s/arcasHLA", path))
+    arcas <- arcas_import(path = sprintf("%s/%s", path, arcas_subdir))
 
     phlat <- tibble(sample = samples) %>%
       mutate(data = map(sample, function(x) {
-        phlat_import(path = sprintf("%s/phlat", path), sample = x)
+        phlat_import(path = sprintf("%s/%s", path, phlat_subdir), sample = x)
       })) %>%
       unnest(data)
 
     opti <- tibble(sample = samples) %>%
       mutate(data = map(sample, function(x) {
-        optitype_import(path = sprintf("%s/optitype", path), sample = x)
+        optitype_import(path = sprintf("%s/%s", path, opti_subdir), sample = x)
       })) %>%
       unnest(data)
 
     miner <- tibble(sample = samples) %>%
       mutate(data = map(sample, function(x) {
-        hlaminer_import(path = sprintf("%s/hla_miner", path), sample = x)
+        hlaminer_import(path = sprintf("%s/%s", path, miner_subdir), sample = x)
       })) %>%
       unnest(data)
 
-    bind_rows(arcas, phlat, opti, miner, invitro) %>%
-      drop_na() %>% 
+    schla <- tibble(sample = samples) %>%
+      mutate(data = map(sample, function(x) {
+        scHLA_genotype_import(path = sprintf("%s/%s", path, schla_subdir), sample = x)
+      })) %>%
+      unnest(data) %>% 
+      mutate_all(as.character)
+    
+    bind_rows(arcas, phlat, opti, miner, schla, invitro) %>%
+      drop_na() %>%
       filter(sample %in% samples)
   })
 }
@@ -263,27 +283,6 @@ get_allele_length <- function(alleles, IMGTHLA_path = "/labs/khatrilab/solomonb/
     mutate_at(c("bp"), as.numeric)
 }
 # get_allele_length(c("B*07:02:01:01"))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 # Basic scHLAcount count matrix import

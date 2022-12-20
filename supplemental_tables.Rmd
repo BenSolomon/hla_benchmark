@@ -1,0 +1,123 @@
+---
+title: "&nbsp;"
+output: pdf_document
+geometry: "left=3cm,right=3cm,top=2cm,bottom=2cm"
+classoption: landscape
+---
+
+```{r Setup, echo = F}
+library(flextable)
+suppressMessages(library(tidyverse))
+
+major_minor_lines <- function(flxtbl) {
+  col_index <- flxtbl$header$dataset %>% 
+    t() %>% 
+    as_tibble() %>% 
+    drop_na() %>% 
+    mutate(index = 1:n()) %>% 
+    distinct(V1, .keep_all = T) %>% 
+    pull(index)
+
+  flxtbl %>% 
+    vline(part = "body",border = fp_border_default(width = 0.5)) %>% 
+    vline(part = "all", j = col_index, border = fp_border_default(width = 2)) %>% 
+    border_outer(border = fp_border_default(width = 2)) %>% 
+    fix_border_issues() 
+    
+}
+
+```
+
+```{r S1_5p_success, echo = F, warning = F, eval = T}
+p5_success_flextable <- readRDS("tables/p5_success_flextable.RDS")
+p5_success_flextable %>% 
+  width(width = 0.4) %>% 
+  rotate(i = 2, rotation = "btlr", part = "header") %>%
+  align(i = 2, align = "center", part = "header") %>% 
+  valign(i = 2, valign = "bottom", part = "header") %>% 
+  major_minor_lines() 
+```
+|       **Supplemental Table 1 - 5'-based scRNA-seq success**
+|       Success of predicted genotypes from 5'-based scRNA-seq sequences. Values represent mean success +/- SEM
+
+\newpage
+```{r S2_5p_accuracy, echo = F, warning = F, eval = T}
+p5_accuracy_flextable <- readRDS("tables/p5_accuracy_flextable.RDS")
+p5_accuracy_flextable %>% 
+  width(width = 0.4) %>% 
+  rotate(i = 2, rotation = "btlr", part = "header") %>%
+  align(i = 2, align = "center", part = "header") %>% 
+  valign(i = 2, valign = "bottom", part = "header") %>% 
+  major_minor_lines() 
+```
+|       **Supplemental Table 2 - 5'-based scRNA-seq accuracy**
+|       Accuracy of predicted genotypes from 5'-based scRNA-seq sequences. Values represent mean accuracy +/- SEM
+
+\newpage
+```{r S3_3p_accuracy, echo = F, warning = F, eval = T}
+p3_accuracy_flextable <- readRDS("tables/p3_accuracy_flextable.RDS")
+p3_accuracy_flextable %>% 
+  width(width = 0.4) %>% 
+  rotate(i = 2, rotation = "btlr", part = "header") %>%
+  align(i = 2, align = "center", part = "header") %>% 
+  valign(i = 2, valign = "bottom", part = "header") %>% 
+  major_minor_lines() 
+```
+|       **Supplemental Table 3 - 3'-based scRNA-seq accuracy**
+|       Accuracy of predicted genotypes from 3'-based scRNA-seq sequences. Values represent mean accuracy +/- SEM
+
+\newpage
+```{r S4_bulk_accuracy, echo = F, warning = F, eval = T}
+bulk_accuracy_flextable <- readRDS("tables/bulk_accuracy_flextable.RDS")
+bulk_accuracy_flextable  %>% 
+  width(width = 0.4) %>% 
+  rotate(i = 2, rotation = "btlr", part = "header") %>%
+  align(i = 2, align = "center", part = "header") %>% 
+  valign(i = 2, valign = "bottom", part = "header") %>% 
+  major_minor_lines() 
+```
+|       **Supplemental Table 4 - 5'-based scRNA-seq accuracy**
+|       Accuracy of predicted genotypes from bulk RNA-seq sequences. Values represent mean accuracy +/- SEM
+
+\newpage
+```{r S5_drb345_accuracy, echo = F, warning = F, eval = T}
+drb345_flextable <- readRDS("tables/drb345_flextable.RDS")
+drb345_flextable  %>% 
+  width(width = 0.4) %>% 
+  rotate(i = 3, rotation = "btlr", part = "header") %>%
+  align(i = 3, align = "center", part = "header") %>% 
+  valign(i = 3, valign = "bottom", part = "header") %>% 
+  major_minor_lines() 
+```
+|       **Supplemental Table 5 - *HLA-DRB345* accuracy**
+|       Accuracy of *HLA-DRB345* genotypes filtered or unfiltered by KNN copy number classifier. Values represent mean accuracy +/- SEM
+
+\newpage
+```{r S6_time_accuracy, echo = F, warning = F, eval = T}
+time_accuracy_flextable <- readRDS("tables/time_accuracy_flextable.RDS")
+time_accuracy_flextable %>% 
+  fontsize(size = 7, part = "all") %>% 
+  width(width = 0.35) %>% 
+  rotate(i = 2, rotation = "btlr", part = "header") %>%
+  align(i = 2, align = "center", part = "header") %>% 
+  valign(i = 2, valign = "bottom", part = "header") %>% 
+  major_minor_lines() 
+```
+|       **Supplemental Table 6 - Reproducibility of genotype prediction accuracy**
+|       Accuracy of predicted genotypes from repeated sampling of individuals at time point 1 (T1) and time point 2 (T2). Values represent mean accuracy +/- SEM
+
+\newpage
+```{r S7_composite_accuracy, echo = F, warning = F, eval = T}
+composite_accuracy_flextable <- readRDS("tables/composite_accuracy_flextable.RDS")
+composite_accuracy_flextable %>% 
+fontsize(size = 7, part = "all") %>% 
+  width(width = 0.35) %>% 
+  rotate(i = 2, rotation = "btlr", part = "header") %>%
+  align(i = 2, align = "center", part = "header") %>% 
+  valign(i = 2, valign = "bottom", part = "header") %>% 
+  major_minor_lines() 
+```
+|       **Supplemental Table 7 - Composite genotype accuracy**
+|       Success of predicted genotypes from using decision tree-based composites. AOP = arcasHLA, OptiType, and PHLAT, 
+|       AO = arcasHLA and OptiType. Values represent mean accuracy +/- SEM
+

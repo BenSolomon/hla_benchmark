@@ -1,6 +1,5 @@
-library(tidyverse)
-library(flextable)
-
+require(tidyverse)
+require(flextable)
 
 ### Prettifies and orders HLA fields
 reformat_hla_field <- function(field_vector, reverse = F){
@@ -37,6 +36,7 @@ reformat_hla_genotyper <- function(genotyper_vector, reverse = F){
         "Composite AOP",
         "Composite AO",
         "Ground truth",
+        "scHLAcount",
         "arcasHLA",
         "HLAminer",
         "PHLAT",
@@ -63,6 +63,38 @@ reformat_hla_loci <- function(loci_vector, reverse = F){
   return(output)
 }
 
+### Exclude genotype accuracy values at parameters where specific
+### genotypers do not generate predictions (i.e. make NA instead of 0)
+### Expects input from calculate_summary_df
+exclude_genotyper_fields <- function(df){
+  df %>% 
+    filter(
+      !(genotyper == "hlaminer" & field == "field_3"),
+      !(genotyper == "phlat" & locus %in% c("DPA1", "DPB1", "DRB3", "DRB4", "DRB5")),
+      !(genotyper == "phlat" & locus %in% c("DPA1", "DPB1", "DRB3", "DRB4", "DRB5")),
+      !(genotyper == "optitype" & grepl("^D", locus)),
+      !(genotyper == "optitype" & field == "field_3"),
+      !(genotyper == "scHLAcount" & grepl("DRB[345]", locus))
+    )
+}
+
+### Add to the end of a ggplot to adjust parameters of legend size
+### E.g. ggplot(...) + adjust_legend_size(...)
+adjust_legend_size <- function(
+  pointSize = 1,
+  titleSize = 12,
+  textSize = 8,
+  spaceLegend = 1){
+  list(
+    guides(shape = guide_legend(override.aes = list(size = pointSize)),
+           color = guide_legend(override.aes = list(size = pointSize))),
+    theme(
+      legend.title = element_text(size = titleSize),
+      legend.text  = element_text(size = textSize),
+      legend.key.size = unit(spaceLegend, "lines")
+    )
+  )
+}
 
 ### Expects format from calculation_functions::allele_tally
 ### Plots relative proportion of 0,1,2 allele predictions across all samples as a bar chart
@@ -92,7 +124,7 @@ gg_hla_prediction_tally <- function(df, loci = NULL, color = "viridis", reverse 
 ### Expects format from calculation_functions::calculate_summary_df
 ### Creates heatmap of mean accuracy
 ### Colors refer to those within the viridis package
-gg_summary_hla_accuracy <- function(df, color_label = "Accuracy", color = "plasma", reverse = F){
+gg_summary_hla_accuracy <- function(df, fill_var = "mean_accuracy", color_label = "Accuracy", color = "plasma", reverse = F){
   viridis_direction <- ifelse(reverse == T, -1, 1)
   df %>% 
     mutate(field = reformat_hla_field(field)) %>% 
@@ -100,7 +132,7 @@ gg_summary_hla_accuracy <- function(df, color_label = "Accuracy", color = "plasm
     mutate(locus = reformat_hla_loci(locus)) %>% 
     mutate(class = ifelse(grepl("^[ABC]",locus),"mhc1","mhc2")) %>% 
     ggplot(aes(x = genotyper, y = locus)) +
-    geom_tile(aes(fill = mean_accuracy), color = "white")+
+    geom_tile(aes(fill = !!sym(fill_var)), color = "white")+
     # geom_text(aes(label = round(mean_accuracy, digits = 1)))+
     # ggrepel::geom_text_repel(aes(label = round(mean_accuracy, digits = 2)), 
     #                          size = 3.5, 
@@ -119,6 +151,50 @@ gg_summary_hla_accuracy <- function(df, color_label = "Accuracy", color = "plasm
                          direction = viridis_direction) +
     labs(x = "", y = "", fill = color_label)
 }
+
+
+### Extension for calculation_functions::gg_summary_hla_accuracy that plots fill_value based on differences between groups
+### absolute_diff converts fill value to an absolute value for cases where + vs. - isn't meaningful
+### Expects format from calculation_functions::accuracy_difference, which is a wrapper around calculation_functions::calculate_summary_df
+gg_diff_heatmaps <- function(df,
+                             fill_var = "mean_difference", # Which variable to use for fill
+                             p_var = "p_val_adj", # Which variable to use for p-value threshold
+                             limit = 1, # Maximum amplitude of fill scale
+                             p_thresh = 0.05, # P value cut off for annotation asterix 
+                             absolute_diff = F,
+                             color_label = "Accuracy"
+) {
+  # Change fill scale based on absolute value
+  scales <- switch(
+    as.character(absolute_diff),
+    "TRUE" = c(0, limit),
+    "FALSE" = c(-limit, limit)
+  )
+  # Change color palette based on absolute value
+  pal <- switch(
+    as.character(absolute_diff),
+    "TRUE" = viridis_pal()(11),
+    "FALSE" = RColorBrewer::brewer.pal(11, "BrBG")
+  )
+  # Convert fill_var based on absolute value
+  if (absolute_diff){
+    df <- df %>% 
+      mutate(fill_var = abs(!!sym(fill_var)))
+  }
+  
+  plt <- gg_summary_hla_accuracy(df, fill_var = fill_var, color_label = color_label) +
+    scale_fill_gradientn(
+      colors = pal,
+      na.value = "transparent",
+      limits = scales,
+      oob = squish
+    ) +
+    geom_point(data = . %>% filter(!!sym(p_var) <= p_thresh),
+               shape = 8)
+  plt$layers[[1]]$aes_params$colour <- "black"
+  return(plt)
+}
+
 
 ### Expects format from calculation_functions::calculate_summary_df
 ### Creates a table of mean accuracy and standard error
@@ -188,6 +264,7 @@ gg_allele_hla_accuracy <- function(df, color_label = "Accuracy", field_selection
       theme(axis.text.x = element_text(angle= 45, hjust = 1))
   })
 }
+
 
 gg_individual_hla_accuracy <- function(df, color_label = "Accuracy", field_selection = "field_2", color = "plasma"){
   suppressMessages({
@@ -284,7 +361,8 @@ gg_runtime <- function(df, include_tasks = NULL){
   arg_col <- makeAssertCollection()
   possible_tasks <- c(
     "FASTQ-COMPILE", "PRE-FASTQC", "TRIM", "POST-FASTQC", "HISAT-AND-SORT",
-    "INDEX", "ARCAS-EXTRACT", "ARCAS-GENOTYPE", "PHLAT", "OPTITYPE","HLAMINER"
+    "INDEX", "ARCAS-EXTRACT", "ARCAS-GENOTYPE", "PHLAT", "OPTITYPE","HLAMINER",
+    "ArcasHLA", "OptiType", "AO", "AOP"
   )
   df_columns <- c("sample", "component", "process_time")
   assertNames(include_tasks, subset.of = possible_tasks, .var.name = "possible tasks", add = arg_col)
@@ -298,7 +376,8 @@ gg_runtime <- function(df, include_tasks = NULL){
     filter(component %in% include_tasks)  %>%
     mutate(component = factor(component, levels = c(
       "FASTQ-COMPILE", "PRE-FASTQC", "TRIM", "POST-FASTQC", "HISAT-AND-SORT",
-      "INDEX", "ARCAS-EXTRACT", "ARCAS-GENOTYPE", "OPTITYPE","PHLAT","HLAMINER"
+      "INDEX", "ARCAS-EXTRACT", "ARCAS-GENOTYPE", "ArcasHLA", "OPTITYPE", "OptiType", "PHLAT","HLAMINER",
+      "AO", "AOP"
     ))) %>%
     drop_na() %>%
     ggplot(aes(x = component, y = process_time))+
@@ -312,15 +391,16 @@ gg_runtime <- function(df, include_tasks = NULL){
   return(plt)
 }
 
-# Removes invalid locus:field:genotyper combinations from an accuracy data frame
-# Makes assumption that accuracy = 0 for every occurence if the combination is invalid (shortcut)
-remove_invalid_combinations <- function(df){
-  df %>% 
-    group_by(genotyper, locus, field) %>% 
-    mutate(total_accuracy = sum(accuracy, na.rm = T)) %>% 
-    filter(total_accuracy !=0) %>% 
-    select(-total_accuracy)
-}
+# # Removes invalid locus:field:genotyper combinations from an accuracy data frame
+# # Makes assumption that accuracy = 0 for every occurence if the combination is invalid (shortcut)
+# # Used in 3_coverage.Rmd, slope stats
+# remove_invalid_combinations <- function(df){
+#   df %>% 
+#     group_by(genotyper, locus, field) %>% 
+#     mutate(total_accuracy = sum(accuracy, na.rm = T)) %>% 
+#     filter(total_accuracy !=0) %>% 
+#     select(-total_accuracy)
+# }
 
 # Plots accuracy metrics vs coverage metrics
 # Expects and accuracy data frame
@@ -345,7 +425,8 @@ gg_coverage <- function(df,
     mutate(genotyper = reformat_hla_genotyper(genotyper)) %>% # Reformat genotyper names
     filter_at(y_var, function(x) !is.na(x)) %>% 
     mutate(n_alleles = factor(n_alleles, levels = 0:2)) %>% 
-    remove_invalid_combinations()
+    exclude_genotyper_fields()
+    # remove_invalid_combinations()
   # ## Remove genotypers not valid for a given genotyper:locus:field combo
   # if (y_var=="accuracy"){
   #   df <- remove_invalid_combinations(df)}

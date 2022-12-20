@@ -21,6 +21,128 @@ isb_samples <- read_tsv("/labs/khatrilab/solomonb/covid/isb/logs/210217_232725/p
   pull(sample) %>% unique()
 ```
 
+# Data processing
+
+### Import and assembly
+```{r, fig.width=8, fig.height = 3}
+# Read data, calculate accuracy, split time points
+accuracy_df <- readRDS("all_hla_drb345_filtered.RDS") %>% 
+  filter(
+    grepl("(AC|BL)$", sample), # Only AC, BL samples
+    grepl("^[ABCD]", locus), # Only HLA-A,B,C,D genes
+    !grepl("^(DM|DO|DRA)|[67]$",locus) # Further limit HLA-D genes
+    ) %>% 
+  calculate_all_hla_accuracy() %>%  # Calculate accuracy
+  separate(sample, into = c("sample", "time"), sep = "-") %>% # Separate time points
+  pivot_wider(names_from = "time", values_from = c("allele", "accuracy")) # Pivot
+
+# Calculate agreement
+agreement_df <- accuracy_df %>% 
+  mutate_at(vars(c("allele_AC", "allele_BL")), function(x) map(x, function(y) ifelse(is.null(y), NA, y))) %>%  # Convert nulls to NAs
+  filter(!(is.na(allele_AC) & is.na(allele_BL))) %>% # Filter out samples with NA genotypes for both time points (can't say whether this represents agreement or not)
+  mutate(observed_agreement = map2_dbl(allele_BL, allele_AC, allele_match, ground_truth = F)) %>%
+  mutate(expected_agreement = accuracy_AC*accuracy_BL) %>%
+  # Replace NAs for expected agreement to 0s 
+  # These always represent an NA accuracy * non-NA accuracy which should have agreement 0
+  mutate(expected_agreement = coalesce(expected_agreement, 0)) %>% 
+  exclude_genotyper_fields() 
+
+# saveRDS(agreement_df, "data/agreement_df.RDS")
+# agreement_df <-  readRDS("data/agreement_df.RDS")
+```
+
+### Time point accuracy
+```{r}
+plt_t1 <- agreement_df %>% calculate_summary_df(var = "accuracy_AC") %>% gg_summary_hla_accuracy(color_label = "T1 accuracy")
+plt_t2 <- agreement_df %>% calculate_summary_df(var = "accuracy_BL") %>% gg_summary_hla_accuracy(color_label = "T2 accuracy")
+plt_t1; plt_t2
+```
+
+```{r}
+plt_t1_t2_diff <- agreement_df %>% 
+  accuracy_difference(var_1 = "accuracy_AC", var_2 = "accuracy_BL", sig_function = "wilcox.test") %>% 
+  gg_diff_heatmaps(color_label = "T1 - T2\naccuracy") 
+plt_t1_t2_diff
+```
+
+### Observed and expected agreement
+```{r}
+plt_ea <- agreement_df %>% calculate_summary_df(var = "expected_agreement") %>% gg_summary_hla_accuracy(color_label = "Expected\nagreement")
+plt_oa <- agreement_df %>% calculate_summary_df(var = "observed_agreement") %>% gg_summary_hla_accuracy(color_label = "Observed\nagreement")
+plt_ea; plt_oa
+```
+
+```{r}
+plt_ea_oa_diff <- agreement_df %>% 
+  accuracy_difference(var_1 = "observed_agreement", var_2 = "expected_agreement", sig_function = "wilcox.test") %>% 
+  gg_diff_heatmaps(color_label = "Observed -\nexpected\nagreement") 
+plt_ea_oa_diff
+```
+
+# Figures
+
+### Main figure
+
+```{r, fig.height=4, fig.width=10}
+plt_fig_main <- plot_grid(
+  plt_t1_t2_diff,
+  plt_ea_oa_diff,
+  nrow = 1,
+  labels = c("A","B")
+)
+plt_fig_main
+```
+
+```{r}
+save_plot("figures_pdf/v2/4_agreement.pdf", plt_fig_main, base_height = 3, base_width = 9)
+```
+
+### Supplemental figure
+
+```{r, fig.width=10, fig.height=8}
+plt_fig_supp <- plot_grid(
+  plt_t1, 
+  plt_t2,
+  plt_ea,
+  plt_oa,
+  nrow = 2,
+  labels = LETTERS[1:4]
+)
+plt_fig_supp
+```
+
+```{r}
+save_plot("figures_pdf/v2/s4_agreement.pdf", plt_fig_supp, base_height = 6, base_width = 9)
+```
+
+# Save all figure objects 
+```{r}
+listN <- function(...) {
+  anonList <- list(...)
+  names(anonList) <- as.character(substitute(list(...)))[-1]
+  anonList
+}
+
+saveRDS(
+  listN(plt_t1_t2_diff,
+        plt_ea_oa_diff,
+        plt_t1,
+        plt_t2,
+        plt_ea,
+        plt_oa),
+  "figures_object/4_agreement_objects.RDS"
+)
+```
+
+# Tables
+
+```{r}
+agreement_df %>% calculate_summary_df(var = "accuracy_AC")
+agreement_df %>% calculate_summary_df(var = "accuracy_BL")
+```
+
+# Earlier analysis
+
 ```{r}
 all_hla <- readRDS("all_hla_drb345_filtered.RDS")
 ```

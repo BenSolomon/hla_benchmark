@@ -114,7 +114,11 @@ drb345_df %>%
   geom_density(alpha = 0.1) +
   theme_bw() +
   scale_fill_brewer(palette = "Set1") + scale_color_brewer(palette = "Set1") +
-  facet_grid(copy_number ~ locus, scales = "free")
+  facet_grid(copy_number ~ locus, scales = "free") +
+  labs(x = "DRB345 / DRB1 ratio", y = "Density")
+
+drb345_ratio_plt_5p <- gg_drb345_ratio(drb345_df_5p)
+drb345_ratio_plt_5p
 ```
 ### KNN model
 
@@ -342,9 +346,15 @@ drb345_filtered_accuracy <- bind_rows(
 ) %>% 
   calculate_drb345_accuracy(match_drb345_na = score_absent) 
 
+# saveRDS(drb345_filtered_accuracy, "data/drb345_filtered_accuracy.RDS")
+# drb345_filtered_accuracy <- readRDS("data/drb345_filtered_accuracy.RDS")
+
 drb345_unfiltered_accuracy <- all_hla %>% 
     filter(grepl("^DRB[345]", locus)) %>% 
     calculate_drb345_accuracy(match_drb345_na = score_absent) 
+
+# saveRDS(drb345_unfiltered_accuracy, "data/drb345_unfiltered_accuracy.RDS")
+# drb345_unfiltered_accuracy <- readRDS("data/drb345_unfiltered_accuracy.RDS")
 
 drb345_accuracy_comparison <- bind_rows(
   drb345_filtered_accuracy %>% 
@@ -359,6 +369,10 @@ drb345_accuracy_comparison <- bind_rows(
            genotyper = "Unfiltered"),
 )
 
+# saveRDS(drb345_accuracy_comparison, "data/drb345_accuracy_comparison.RDS")
+# drb345_accuracy_comparison <- readRDS("data/drb345_accuracy_comparison.RDS")
+```
+```{R, fig.width = 4, fig.height = 3}
 drb345_accuracy_plt <- drb345_accuracy_comparison %>% 
   mutate(genotyper = fct_relevel(genotyper, "Unfiltered", "Filtered")) %>% 
   gg_summary_hla_accuracy(color_label = "Accuracy") + 
@@ -366,6 +380,29 @@ drb345_accuracy_plt <- drb345_accuracy_comparison %>%
   theme(strip.text.y = element_text(angle = 270))
 
 drb345_accuracy_plt
+```
+```{R, fig.width = 4, fig.height = 2.5}
+drb345_difference_df <- bind_rows(
+  drb345_filtered_accuracy %>% mutate(filter = "filtered"),
+  drb345_unfiltered_accuracy %>% mutate(filter = "unfiltered")
+) %>%
+  dplyr::select(-reference, -allele) %>%
+  pivot_wider(names_from = "filter", values_from = "accuracy") %>%
+  accuracy_difference(var_1 = "filtered",
+                      var_2 = "unfiltered",
+                      sig_function = "wilcox.test")
+
+# saveRDS(drb345_difference_df, "data/drb345_difference_df.RDS")
+# drb345_difference_df <- readRDS("data/drb345_difference_df.RDS")
+
+drb345_difference_plt <- drb345_difference_df %>% 
+  mutate(genotyper_2 = genotyper, genotyper = reformat_hla_field(field)) %>% 
+  gg_diff_heatmaps(color_label = "Filtered -\nunfiltered\naccuracy") +
+  facet_grid(genotyper_2 ~ field, scales = "free_x") +
+  theme(strip.text.y = element_text(angle = 270),
+        strip.text.x = element_blank()) 
+  
+drb345_difference_plt
 ```
 
 ```{r}
@@ -397,7 +434,7 @@ df_key <- suppressWarnings({tibble(col_keys = names(drb345_table)) %>%
     separate(col_keys, into = c("field", "genotyper"), sep = "-", remove = F) %>%
     separate(genotyper, into = c("genotyper", "filter"), sep = " ") %>% 
     drop_na()})
-drb345_table %>% 
+drb345_flextable <- drb345_table %>% 
   flextable() %>% 
   colformat_char(na_str = "---") %>% 
   set_header_df(mapping = df_key, key = "col_keys") %>% 
@@ -407,17 +444,11 @@ drb345_table %>%
   # vline(j=c(3,7,11), border = fp_border_default()) 
   vline(j=seq(1,12, by = 2), border = fp_border_default()) %>% 
   fix_border_issues() %>% 
-  fontsize(size = 8, part = "all") %>% 
-  print(preview = "pptx")
-```
-```{r}
-calculate_summary_df(drb345_accuracy_comparison) %>% 
-  flex_summary_hla_accuracy() %>% 
-  fontsize(size = 8, part = "all") %>% 
-  print(preview = "pptx")
-```
+  fontsize(size = 8, part = "all") 
 
-
+saveRDS(drb345_flextable, "tables/drb345_flextable.RDS")
+print(drb345_flextable)
+```
 
 ```{r}
 # saveRDS(drb345_accuracy, "drb345_accuracy.RDS")
@@ -452,8 +483,7 @@ plot_grid(
 ### Alternative combined plot
 
 ```{r, fig.width = 8, fig.height = 6}
-
-plot_grid(
+plt_fig_main <- plot_grid(
   plot_grid(
     testing_plt, allele_contingency_plt,
     nrow = 1,
@@ -472,8 +502,39 @@ plot_grid(
   ),
   ncol = 1
 )
+plt_fig_main
 ```
 
+
+
+```{r, fig.width = 8, fig.height = 6}
+plt_fig_main <- plot_grid(
+  plot_grid(
+    testing_plt, allele_contingency_plt,
+    nrow = 1,
+    align = "h",
+    axis = "tb",
+    labels = c("A","B")
+  ),
+  plot_grid(
+    drb345_similarity_plt, 
+    drb345_accuracy_plt + adjust_legend_size(titleSize = 10, textSize = 8, spaceLegend = 1), 
+    drb345_difference_plt + adjust_legend_size(titleSize = 10, textSize = 8, spaceLegend = 1),
+    nrow = 1,
+    align = "h",
+    axis = "tb",
+    labels = c("C","D", "E"),
+    rel_widths = c(0.7,1,0.8)
+  ),
+  ncol = 1
+)
+plt_fig_main
+```
+
+```{r}
+save_plot("figures_pdf/v2/3_DRB.pdf", plt_fig_main, ncol = 2,nrow = 2, base_asp = 1.3)
+# save_plot("figures/v2/2_accuracy.pdf", plt_fig_main, base_height = 8, base_width = 4)
+```
 
 ### Updating all_hla with filtered DRB345 and verifying
 ```{r}
@@ -497,6 +558,51 @@ accuracy_df %>%
   gg_summary_hla_accuracy(color_label = "Accuracy")
 ```
 
+# Save all figure objects 
+```{r}
+listN <- function(...){
+    anonList <- list(...)
+    names(anonList) <- as.character(substitute(list(...)))[-1]
+    anonList
+}
+
+saveRDS(
+  listN(
+    testing_plt,
+    allele_contingency_plt,
+    drb345_similarity_plt,
+    drb345_accuracy_plt,
+    pre_tally_plt,
+    post_tally_plt
+  ),
+  "figures_object/4_DRB_objects.RDS"
+)
+
+```
+
+# Supplemental figure
+
+```{r}
+fig6_objects <- readRDS("figures_object/6_platforms.RDS")
+```
+```{r, fig.width = 8, fig.height = 9}
+plt_fig_supp <- plot_grid(
+  drb345_ratio_plt_5p,
+  testing_plt,
+  fig6_objects$drb345_ratio_plt_3p,
+  fig6_objects$drb345_ROC_3p,
+  fig6_objects$drb345_ratio_plt_bulk,
+  fig6_objects$drb345_ROC_bulk,
+  ncol = 2,
+  rel_widths = c(0.9,1),
+  labels = LETTERS[1:6]
+)
+plt_fig_supp
+```
+
+```{r}
+save_plot("figures_pdf/v2/s3_drb.pdf", plt_fig_supp, base_height = 9, base_width = 8)
+```
 
 
 # Old work
