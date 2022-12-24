@@ -1,0 +1,72 @@
+
+mapping with 16 threads...
+
+ 0:00:01.73 Mapping INCOV079-BL.extracted.fq.gz to NUC reference...
+
+ 0:09:46.82 Generating binary hit matrix.
+0:09:46.87 Loading /labs/khatrilab/solomonb/covid/isb/optitype/INCOV079-BL_1.bam started. Number of HLA reads loaded (updated every thousand):
+1K...2K...3K...4K...5K...6K...7K...8K...9K...10K...11K...12K...13K...14K...15K...16K...17K...18K...19K...20K...21K...22K...23K...24K...25K...26K...27K...28K...29K...30K...31K...32K...33K...34K...35K...36K...37K...38K...39K...40K...41K...42K...43K...44K...45K...46K...47K...48K...49K...50K...51K...52K...53K...54K...55K...56K...57K...58K...59K...60K...61K...62K...63K...64K...65K...66K...67K...68K...69K...70K...71K...72K...73K...74K...75K...76K...77K...78K...79K...80K...81K...82K...83K...84K...85K...86K...87K...88K...89K...90K...91K...92K...93K...94K...95K...96K...97K...98K...99K...100K...101K...102K...103K...104K...105K...106K...107K...108K...109K...110K...111K...112K...113K...114K...115K...116K...117K...118K...119K...120K...121K...122K...123K...124K...125K...126K...127K...128K...129K...130K...131K...132K...133K...134K...135K...136K...137K...138K...139K...140K...141K...142K...143K...144K...145K...146K...147K...148K...149K...150K...151K...152K...153K...154K...155K...156K...157K...158K...159K...160K...161K...162K...163K...164K...165K...166K...167K...168K...169K...170K...171K...172K...173K...174K...175K...176K...177K...
+ 0:11:01.71 177918 reads loaded. Creating dataframe...
+0:31:52.07 Dataframes created. Shape: 177918 x 7339, hits: 62808866 (63579692), sparsity: 1 in 20.54
+
+ 0:33:09.22 temporary pruning of identical rows and columns
+
+ 0:33:15.87 Size of mtx with unique rows and columns: (3703, 1987)
+0:33:15.87 determining minimal set of non-overshadowed alleles
+
+ 0:34:09.38 Keeping only the minimal number of required alleles (1008,)
+
+ 0:34:11.51 Creating compact model...
+
+starting ilp solver with 1 threads...
+
+ 0:37:17.40 Initializing OptiType model...
+GLPSOL: GLPK LP/MIP Solver, v4.57
+Parameter(s) specified in the command line:
+ --write /tmp/tmpz69AC2.glpk.raw --wglp /tmp/tmpb_Yb4_.glpk.glp --cpxlp /tmp/tmp0XEkHm.pyomo.lp
+Reading problem data from '/tmp/tmp0XEkHm.pyomo.lp'...
+/tmp/tmp0XEkHm.pyomo.lp:183195: warning: lower bound of variable 'x10239' redefined
+/tmp/tmp0XEkHm.pyomo.lp:183195: warning: upper bound of variable 'x10239' redefined
+10238 rows, 6124 columns, 141235 non-zeros
+3565 integer variables, all of which are binary
+186760 lines were read
+Writing problem data to '/tmp/tmpb_Yb4_.glpk.glp'...
+175511 lines were written
+GLPK Integer Optimizer, v4.57
+10238 rows, 6124 columns, 141235 non-zeros
+3565 integer variables, all of which are binary
+Preprocessing...
+2313 hidden covering inequaliti(es) were detected
+10237 rows, 6123 columns, 141234 non-zeros
+3565 integer variables, all of which are binary
+Scaling...
+ A: min|aij| =  1.000e+00  max|aij| =  4.000e+00  ratio =  4.000e+00
+Problem data seem to be well scaled
+Constructing initial basis...
+Size of triangular part is 10237
+Solving LP relaxation...
+GLPK Simplex Optimizer, v4.57
+10237 rows, 6123 columns, 141234 non-zeros
+      0: obj =  -0.000000000e+00 inf =   4.000e+00 (4)
+      4: obj =  -0.000000000e+00 inf =   0.000e+00 (0)
+*   500: obj =   1.041229067e+05 inf =   8.896e-15 (2336)
+*  1000: obj =   1.197662340e+05 inf =   1.110e-16 (2092) 2
+*  1500: obj =   1.273266520e+05 inf =   0.000e+00 (1722) 1
+*  2000: obj =   1.286097480e+05 inf =   0.000e+00 (1346)
+*  2500: obj =   1.288507760e+05 inf =   0.000e+00 (1106)
+*  3000: obj =   1.289267760e+05 inf =   0.000e+00 (912)
+*  3500: obj =   1.293213410e+05 inf =   0.000e+00 (583)
+*  4000: obj =   1.296807840e+05 inf =   0.000e+00 (83)
+*  4083: obj =   1.297407930e+05 inf =   0.000e+00 (0)
+OPTIMAL LP SOLUTION FOUND
+Integer optimization begins...
++  4083: mip =     not found yet <=              +inf        (1; 0)
++  4083: >>>>>   1.297407930e+05 <=   1.297407930e+05   0.0% (1; 0)
++  4083: mip =   1.297407930e+05 <=     tree is empty   0.0% (0; 1)
+INTEGER OPTIMAL SOLUTION FOUND
+Time used:   1.4 secs
+Memory used: 28.6 Mb (29956336 bytes)
+Writing MIP solution to '/tmp/tmpz69AC2.glpk.raw'...
+16364 lines were written
+
+ 0:37:38.73 Result dataframe has been constructed...

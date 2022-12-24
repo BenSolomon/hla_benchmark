@@ -1,0 +1,70 @@
+
+mapping with 16 threads...
+
+ 0:00:01.64 Mapping INCOV137-AC.extracted.fq.gz to NUC reference...
+
+ 0:08:58.64 Generating binary hit matrix.
+0:08:58.68 Loading /labs/khatrilab/solomonb/covid/isb/optitype/INCOV137-AC_1.bam started. Number of HLA reads loaded (updated every thousand):
+1K...2K...3K...4K...5K...6K...7K...8K...9K...10K...11K...12K...13K...14K...15K...16K...17K...18K...19K...20K...21K...22K...23K...24K...25K...26K...27K...28K...29K...30K...31K...32K...33K...34K...35K...36K...37K...38K...39K...40K...41K...42K...43K...44K...45K...46K...47K...48K...49K...50K...51K...52K...53K...54K...55K...56K...57K...58K...59K...60K...61K...62K...63K...64K...65K...66K...67K...68K...69K...70K...71K...72K...73K...74K...75K...76K...77K...78K...79K...80K...81K...82K...83K...84K...85K...86K...87K...88K...89K...90K...91K...92K...93K...94K...95K...96K...97K...98K...99K...100K...101K...102K...103K...104K...105K...106K...107K...108K...109K...110K...111K...112K...113K...114K...115K...116K...117K...118K...119K...120K...121K...122K...123K...124K...125K...126K...127K...128K...129K...130K...131K...132K...133K...134K...135K...136K...137K...138K...139K...140K...141K...142K...143K...144K...145K...146K...147K...148K...149K...150K...151K...152K...153K...154K...155K...156K...157K...158K...159K...160K...161K...162K...163K...164K...165K...166K...167K...168K...169K...170K...171K...172K...173K...174K...175K...176K...177K...178K...
+ 0:10:11.34 178684 reads loaded. Creating dataframe...
+0:29:56.23 Dataframes created. Shape: 178684 x 7339, hits: 56999141 (57067100), sparsity: 1 in 22.98
+
+ 0:31:13.44 temporary pruning of identical rows and columns
+
+ 0:31:16.88 Size of mtx with unique rows and columns: (2826, 1767)
+0:31:16.88 determining minimal set of non-overshadowed alleles
+
+ 0:31:50.42 Keeping only the minimal number of required alleles (800,)
+
+ 0:31:51.26 Creating compact model...
+
+starting ilp solver with 1 threads...
+
+ 0:34:09.89 Initializing OptiType model...
+GLPSOL: GLPK LP/MIP Solver, v4.57
+Parameter(s) specified in the command line:
+ --write /tmp/tmp7FAhO8.glpk.raw --wglp /tmp/tmpXepydy.glpk.glp --cpxlp /tmp/tmpxDEdvU.pyomo.lp
+Reading problem data from '/tmp/tmpxDEdvU.pyomo.lp'...
+/tmp/tmpxDEdvU.pyomo.lp:126394: warning: lower bound of variable 'x7901' redefined
+/tmp/tmpxDEdvU.pyomo.lp:126394: warning: upper bound of variable 'x7901' redefined
+7900 rows, 4746 columns, 93996 non-zeros
+2772 integer variables, all of which are binary
+129166 lines were read
+Writing problem data to '/tmp/tmpXepydy.glpk.glp'...
+120463 lines were written
+GLPK Integer Optimizer, v4.57
+7900 rows, 4746 columns, 93996 non-zeros
+2772 integer variables, all of which are binary
+Preprocessing...
+1768 hidden covering inequaliti(es) were detected
+7896 rows, 4744 columns, 93990 non-zeros
+2771 integer variables, all of which are binary
+Scaling...
+ A: min|aij| =  1.000e+00  max|aij| =  5.000e+00  ratio =  5.000e+00
+Problem data seem to be well scaled
+Constructing initial basis...
+Size of triangular part is 7896
+Solving LP relaxation...
+GLPK Simplex Optimizer, v4.57
+7896 rows, 4744 columns, 93990 non-zeros
+      0: obj =  -0.000000000e+00 inf =   4.000e+00 (4)
+      4: obj =  -0.000000000e+00 inf =   0.000e+00 (0)
+*   500: obj =   1.273728480e+05 inf =   1.684e-15 (1813) 1
+*  1000: obj =   1.416763230e+05 inf =   3.301e-14 (1455)
+*  1500: obj =   1.423954490e+05 inf =   4.645e-14 (1174)
+*  2000: obj =   1.426637260e+05 inf =   5.899e-14 (973)
+*  2500: obj =   1.428587240e+05 inf =   7.098e-14 (787)
+*  3000: obj =   1.432980240e+05 inf =   1.343e-13 (288)
+*  3286: obj =   1.434620390e+05 inf =   2.324e-15 (0)
+OPTIMAL LP SOLUTION FOUND
+Integer optimization begins...
++  3286: mip =     not found yet <=              +inf        (1; 0)
++  3286: >>>>>   1.434620390e+05 <=   1.434620390e+05   0.0% (1; 0)
++  3286: mip =   1.434620390e+05 <=     tree is empty   0.0% (0; 1)
+INTEGER OPTIMAL SOLUTION FOUND
+Time used:   0.9 secs
+Memory used: 19.9 Mb (20894590 bytes)
+Writing MIP solution to '/tmp/tmp7FAhO8.glpk.raw'...
+12648 lines were written
+
+ 0:34:23.56 Result dataframe has been constructed...

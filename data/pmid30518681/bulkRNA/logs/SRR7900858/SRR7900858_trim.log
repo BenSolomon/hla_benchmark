@@ -1,0 +1,320 @@
+Using an excessive number of cores has a diminishing return! It is recommended not to exceed 8 cores per trimming process (you asked for 8 cores). Please consider re-specifying
+Path to Cutadapt set as: 'cutadapt' (default)
+Cutadapt seems to be working fine (tested command 'cutadapt --version')
+Cutadapt version: 2.10
+Could not detect version of Python used by Cutadapt from the first line of Cutadapt (but found this: >>>#!/bin/sh<<<)
+Letting the (modified) Cutadapt deal with the Python version instead
+Parallel gzip (pigz) detected. Proceeding with multicore (de)compression using 8 cores
+
+No quality encoding type selected. Assuming that the data provided uses Sanger encoded Phred scores (default)
+
+Output will be written into the directory: /labs/khatrilab/solomonb/covid/pmid30518681/bulkRNA/raw_fastq/
+
+
+AUTO-DETECTING ADAPTER TYPE
+===========================
+Attempting to auto-detect adapter type from the first 1 million sequences of the first file (>> /labs/khatrilab/solomonb/covid/pmid30518681/bulkRNA/raw_fastq/SRR7900858_1.fastq.gz <<)
+
+Found perfect matches for the following adapter sequences:
+Adapter type	Count	Sequence	Sequences analysed	Percentage
+Illumina	2012	AGATCGGAAGAGC	1000000	0.20
+smallRNA	7	TGGAATTCTCGG	1000000	0.00
+Nextera	3	CTGTCTCTTATA	1000000	0.00
+Using Illumina adapter for trimming (count: 2012). Second best hit was smallRNA (count: 7)
+
+Writing report to '/labs/khatrilab/solomonb/covid/pmid30518681/bulkRNA/raw_fastq/SRR7900858_1.fastq.gz_trimming_report.txt'
+
+SUMMARISING RUN PARAMETERS
+==========================
+Input filename: /labs/khatrilab/solomonb/covid/pmid30518681/bulkRNA/raw_fastq/SRR7900858_1.fastq.gz
+Trimming mode: paired-end
+Trim Galore version: 0.6.4_dev
+Cutadapt version: 2.10
+Python version: could not detect
+Number of cores used for trimming: 8
+Quality Phred score cutoff: 20
+Quality encoding type selected: ASCII+33
+Adapter sequence: 'AGATCGGAAGAGC' (Illumina TruSeq, Sanger iPCR; auto-detected)
+Maximum trimming error rate: 0.1 (default)
+Minimum required adapter overlap (stringency): 1 bp
+Minimum required sequence length for both reads before a sequence pair gets removed: 20 bp
+Output file(s) will be GZIP compressed
+
+Cutadapt seems to be fairly up-to-date (version 2.10). Setting -j 8
+Writing final adapter and quality trimmed output to SRR7900858_1_trimmed.fq.gz
+
+
+  >>> Now performing quality (cutoff '-q 20') and adapter trimming in a single pass for the adapter sequence: 'AGATCGGAAGAGC' from file /labs/khatrilab/solomonb/covid/pmid30518681/bulkRNA/raw_fastq/SRR7900858_1.fastq.gz <<< 
+10000000 sequences processed
+20000000 sequences processed
+30000000 sequences processed
+40000000 sequences processed
+50000000 sequences processed
+This is cutadapt 2.10 with Python 3.7.8
+Command line parameters: -j 8 -e 0.1 -q 20 -O 1 -a AGATCGGAAGAGC /labs/khatrilab/solomonb/covid/pmid30518681/bulkRNA/raw_fastq/SRR7900858_1.fastq.gz
+Processing reads on 8 cores in single-end mode ...
+Finished in 188.78 s (4 us/read; 16.48 M reads/minute).
+
+=== Summary ===
+
+Total reads processed:              51,854,932
+Reads with adapters:                15,904,753 (30.7%)
+Reads written (passing filters):    51,854,932 (100.0%)
+
+Total basepairs processed: 3,889,119,900 bp
+Quality-trimmed:               4,025,197 bp (0.1%)
+Total written (filtered):  3,858,874,001 bp (99.2%)
+
+=== Adapter 1 ===
+
+Sequence: AGATCGGAAGAGC; Type: regular 3'; Length: 13; Trimmed: 15904753 times
+
+No. of allowed errors:
+0-9 bp: 0; 10-13 bp: 1
+
+Bases preceding removed adapters:
+  A: 28.0%
+  C: 29.6%
+  G: 22.9%
+  T: 19.5%
+  none/other: 0.0%
+
+Overview of removed sequences
+length	count	expect	max.err	error counts
+1	10913273	12963733.0	0	10913273
+2	3599685	3240933.2	0	3599685
+3	886034	810233.3	0	886034
+4	181628	202558.3	0	181628
+5	57010	50639.6	0	57010
+6	25713	12659.9	0	25713
+7	22880	3165.0	0	22880
+8	19678	791.2	0	19678
+9	19578	197.8	0	19120 458
+10	18155	49.5	1	17085 1070
+11	16097	12.4	1	15536 561
+12	14870	3.1	1	14407 463
+13	15688	0.8	1	15150 538
+14	11857	0.8	1	11538 319
+15	12643	0.8	1	12238 405
+16	10062	0.8	1	9756 306
+17	9856	0.8	1	9528 328
+18	8468	0.8	1	8143 325
+19	7228	0.8	1	6994 234
+20	6369	0.8	1	6075 294
+21	5477	0.8	1	5273 204
+22	4570	0.8	1	4361 209
+23	3975	0.8	1	3816 159
+24	3418	0.8	1	3302 116
+25	2839	0.8	1	2719 120
+26	2039	0.8	1	1985 54
+27	1756	0.8	1	1668 88
+28	1402	0.8	1	1317 85
+29	916	0.8	1	863 53
+30	768	0.8	1	729 39
+31	624	0.8	1	587 37
+32	686	0.8	1	646 40
+33	545	0.8	1	505 40
+34	580	0.8	1	532 48
+35	418	0.8	1	386 32
+36	454	0.8	1	415 39
+37	294	0.8	1	277 17
+38	367	0.8	1	336 31
+39	298	0.8	1	277 21
+40	247	0.8	1	233 14
+41	290	0.8	1	244 46
+42	219	0.8	1	195 24
+43	399	0.8	1	355 44
+44	121	0.8	1	99 22
+45	196	0.8	1	170 26
+46	157	0.8	1	118 39
+47	160	0.8	1	135 25
+48	187	0.8	1	160 27
+49	151	0.8	1	116 35
+50	143	0.8	1	117 26
+51	105	0.8	1	89 16
+52	79	0.8	1	60 19
+53	106	0.8	1	77 29
+54	103	0.8	1	61 42
+55	76	0.8	1	54 22
+56	52	0.8	1	20 32
+57	106	0.8	1	65 41
+58	71	0.8	1	28 43
+59	45	0.8	1	20 25
+60	38	0.8	1	15 23
+61	35	0.8	1	13 22
+62	42	0.8	1	12 30
+63	36	0.8	1	14 22
+64	34	0.8	1	6 28
+65	53	0.8	1	4 49
+66	35	0.8	1	7 28
+67	27	0.8	1	5 22
+68	14	0.8	1	4 10
+69	30	0.8	1	3 27
+70	40	0.8	1	10 30
+71	23	0.8	1	2 21
+72	62	0.8	1	11 51
+73	42	0.8	1	1 41
+74	112	0.8	1	0 112
+75	12919	0.8	1	4 12915
+
+RUN STATISTICS FOR INPUT FILE: /labs/khatrilab/solomonb/covid/pmid30518681/bulkRNA/raw_fastq/SRR7900858_1.fastq.gz
+=============================================
+51854932 sequences processed in total
+The length threshold of paired-end sequences gets evaluated later on (in the validation step)
+
+Writing report to '/labs/khatrilab/solomonb/covid/pmid30518681/bulkRNA/raw_fastq/SRR7900858_2.fastq.gz_trimming_report.txt'
+
+SUMMARISING RUN PARAMETERS
+==========================
+Input filename: /labs/khatrilab/solomonb/covid/pmid30518681/bulkRNA/raw_fastq/SRR7900858_2.fastq.gz
+Trimming mode: paired-end
+Trim Galore version: 0.6.4_dev
+Cutadapt version: 2.10
+Python version: could not detect
+Number of cores used for trimming: 8
+Quality Phred score cutoff: 20
+Quality encoding type selected: ASCII+33
+Adapter sequence: 'AGATCGGAAGAGC' (Illumina TruSeq, Sanger iPCR; auto-detected)
+Maximum trimming error rate: 0.1 (default)
+Minimum required adapter overlap (stringency): 1 bp
+Minimum required sequence length for both reads before a sequence pair gets removed: 20 bp
+Output file(s) will be GZIP compressed
+
+Cutadapt seems to be fairly up-to-date (version 2.10). Setting -j -j 8
+Writing final adapter and quality trimmed output to SRR7900858_2_trimmed.fq.gz
+
+
+  >>> Now performing quality (cutoff '-q 20') and adapter trimming in a single pass for the adapter sequence: 'AGATCGGAAGAGC' from file /labs/khatrilab/solomonb/covid/pmid30518681/bulkRNA/raw_fastq/SRR7900858_2.fastq.gz <<< 
+10000000 sequences processed
+20000000 sequences processed
+30000000 sequences processed
+40000000 sequences processed
+50000000 sequences processed
+This is cutadapt 2.10 with Python 3.7.8
+Command line parameters: -j 8 -e 0.1 -q 20 -O 1 -a AGATCGGAAGAGC /labs/khatrilab/solomonb/covid/pmid30518681/bulkRNA/raw_fastq/SRR7900858_2.fastq.gz
+Processing reads on 8 cores in single-end mode ...
+Finished in 181.42 s (3 us/read; 17.15 M reads/minute).
+
+=== Summary ===
+
+Total reads processed:              51,854,932
+Reads with adapters:                17,520,737 (33.8%)
+Reads written (passing filters):    51,854,932 (100.0%)
+
+Total basepairs processed: 3,889,119,900 bp
+Quality-trimmed:              15,826,221 bp (0.4%)
+Total written (filtered):  3,845,218,087 bp (98.9%)
+
+=== Adapter 1 ===
+
+Sequence: AGATCGGAAGAGC; Type: regular 3'; Length: 13; Trimmed: 17520737 times
+
+No. of allowed errors:
+0-9 bp: 0; 10-13 bp: 1
+
+Bases preceding removed adapters:
+  A: 34.6%
+  C: 27.3%
+  G: 19.9%
+  T: 18.2%
+  none/other: 0.0%
+
+Overview of removed sequences
+length	count	expect	max.err	error counts
+1	12588235	12963733.0	0	12588235
+2	3310907	3240933.2	0	3310907
+3	1105142	810233.3	0	1105142
+4	169309	202558.3	0	169309
+5	72351	50639.6	0	72351
+6	28752	12659.9	0	28752
+7	23690	3165.0	0	23690
+8	19582	791.2	0	19582
+9	21987	197.8	0	21296 691
+10	16364	49.5	1	15095 1269
+11	16590	12.4	1	15756 834
+12	15346	3.1	1	14842 504
+13	14285	0.8	1	13904 381
+14	16767	0.8	1	16319 448
+15	8669	0.8	1	8428 241
+16	11363	0.8	1	11021 342
+17	12212	0.8	1	11893 319
+18	5535	0.8	1	5366 169
+19	8069	0.8	1	7834 235
+20	5410	0.8	1	5262 148
+21	5447	0.8	1	5282 165
+22	4532	0.8	1	4370 162
+23	4092	0.8	1	3952 140
+24	4017	0.8	1	3861 156
+25	2317	0.8	1	2220 97
+26	2260	0.8	1	2144 116
+27	1847	0.8	1	1776 71
+28	1423	0.8	1	1315 108
+29	931	0.8	1	878 53
+30	1085	0.8	1	996 89
+31	477	0.8	1	439 38
+32	698	0.8	1	641 57
+33	632	0.8	1	565 67
+34	652	0.8	1	591 61
+35	464	0.8	1	413 51
+36	588	0.8	1	520 68
+37	301	0.8	1	247 54
+38	532	0.8	1	475 57
+39	200	0.8	1	148 52
+40	358	0.8	1	297 61
+41	329	0.8	1	276 53
+42	413	0.8	1	355 58
+43	220	0.8	1	173 47
+44	276	0.8	1	233 43
+45	351	0.8	1	271 80
+46	192	0.8	1	146 46
+47	226	0.8	1	169 57
+48	272	0.8	1	210 62
+49	181	0.8	1	147 34
+50	182	0.8	1	140 42
+51	194	0.8	1	162 32
+52	66	0.8	1	28 38
+53	146	0.8	1	106 40
+54	57	0.8	1	35 22
+55	107	0.8	1	65 42
+56	75	0.8	1	42 33
+57	80	0.8	1	47 33
+58	111	0.8	1	59 52
+59	81	0.8	1	26 55
+60	41	0.8	1	16 25
+61	50	0.8	1	17 33
+62	46	0.8	1	20 26
+63	38	0.8	1	16 22
+64	22	0.8	1	4 18
+65	32	0.8	1	8 24
+66	65	0.8	1	5 60
+67	1169	0.8	1	10 1159
+68	2119	0.8	1	1 2118
+69	2428	0.8	1	5 2423
+70	1581	0.8	1	10 1571
+71	749	0.8	1	3 746
+72	454	0.8	1	1 453
+73	251	0.8	1	1 250
+74	341	0.8	1	1 340
+75	4374	0.8	1	1 4373
+
+RUN STATISTICS FOR INPUT FILE: /labs/khatrilab/solomonb/covid/pmid30518681/bulkRNA/raw_fastq/SRR7900858_2.fastq.gz
+=============================================
+51854932 sequences processed in total
+The length threshold of paired-end sequences gets evaluated later on (in the validation step)
+
+Validate paired-end files SRR7900858_1_trimmed.fq.gz and SRR7900858_2_trimmed.fq.gz
+file_1: SRR7900858_1_trimmed.fq.gz, file_2: SRR7900858_2_trimmed.fq.gz
+
+
+>>>>> Now validing the length of the 2 paired-end infiles: SRR7900858_1_trimmed.fq.gz and SRR7900858_2_trimmed.fq.gz <<<<<
+Writing validated paired-end Read 1 reads to SRR7900858_1_val_1.fq.gz
+Writing validated paired-end Read 2 reads to SRR7900858_2_val_2.fq.gz
+
+Total number of sequences analysed: 51854932
+
+Number of sequence pairs removed because at least one read was shorter than the length cutoff (20 bp): 44360 (0.09%)
+
+Deleting both intermediate output files SRR7900858_1_trimmed.fq.gz and SRR7900858_2_trimmed.fq.gz
+
+====================================================================================================
+

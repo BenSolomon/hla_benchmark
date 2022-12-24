@@ -1,0 +1,178 @@
+Using an excessive number of cores has a diminishing return! It is recommended not to exceed 8 cores per trimming process (you asked for 8 cores). Please consider re-specifying
+Path to Cutadapt set as: 'cutadapt' (default)
+Cutadapt seems to be working fine (tested command 'cutadapt --version')
+Cutadapt version: 2.10
+Could not detect version of Python used by Cutadapt from the first line of Cutadapt (but found this: >>>#!/bin/sh<<<)
+Letting the (modified) Cutadapt deal with the Python version instead
+Parallel gzip (pigz) detected. Proceeding with multicore (de)compression using 8 cores
+
+No quality encoding type selected. Assuming that the data provided uses Sanger encoded Phred scores (default)
+
+Output will be written into the directory: /labs/khatrilab/solomonb/covid/isb/temp_fastq/
+
+
+AUTO-DETECTING ADAPTER TYPE
+===========================
+Attempting to auto-detect adapter type from the first 1 million sequences of the first file (>> /labs/khatrilab/solomonb/covid/isb/temp_fastq/INCOV113-AC_R2.fastq.gz <<)
+
+Found perfect matches for the following adapter sequences:
+Adapter type	Count	Sequence	Sequences analysed	Percentage
+Illumina	2583	AGATCGGAAGAGC	1000000	0.26
+smallRNA	11	TGGAATTCTCGG	1000000	0.00
+Nextera	4	CTGTCTCTTATA	1000000	0.00
+Using Illumina adapter for trimming (count: 2583). Second best hit was smallRNA (count: 11)
+
+Writing report to '/labs/khatrilab/solomonb/covid/isb/temp_fastq/INCOV113-AC_R2.fastq.gz_trimming_report.txt'
+
+SUMMARISING RUN PARAMETERS
+==========================
+Input filename: /labs/khatrilab/solomonb/covid/isb/temp_fastq/INCOV113-AC_R2.fastq.gz
+Trimming mode: single-end
+Trim Galore version: 0.6.4_dev
+Cutadapt version: 2.10
+Python version: could not detect
+Number of cores used for trimming: 8
+Quality Phred score cutoff: 20
+Quality encoding type selected: ASCII+33
+Adapter sequence: 'AGATCGGAAGAGC' (Illumina TruSeq, Sanger iPCR; auto-detected)
+Maximum trimming error rate: 0.1 (default)
+Minimum required adapter overlap (stringency): 1 bp
+Minimum required sequence length before a sequence gets removed: 20 bp
+Output file(s) will be GZIP compressed
+
+Cutadapt seems to be fairly up-to-date (version 2.10). Setting -j 8
+Writing final adapter and quality trimmed output to INCOV113-AC_R2_trimmed.fq.gz
+
+
+  >>> Now performing quality (cutoff '-q 20') and adapter trimming in a single pass for the adapter sequence: 'AGATCGGAAGAGC' from file /labs/khatrilab/solomonb/covid/isb/temp_fastq/INCOV113-AC_R2.fastq.gz <<< 
+10000000 sequences processed
+20000000 sequences processed
+30000000 sequences processed
+This is cutadapt 2.10 with Python 3.7.8
+Command line parameters: -j 8 -e 0.1 -q 20 -O 1 -a AGATCGGAAGAGC /labs/khatrilab/solomonb/covid/isb/temp_fastq/INCOV113-AC_R2.fastq.gz
+Processing reads on 8 cores in single-end mode ...
+Finished in 155.14 s (5 us/read; 12.30 M reads/minute).
+
+=== Summary ===
+
+Total reads processed:              31,807,430
+Reads with adapters:                 9,452,169 (29.7%)
+Reads written (passing filters):    31,807,430 (100.0%)
+
+Total basepairs processed: 2,894,476,130 bp
+Quality-trimmed:              23,795,520 bp (0.8%)
+Total written (filtered):  2,855,568,154 bp (98.7%)
+
+=== Adapter 1 ===
+
+Sequence: AGATCGGAAGAGC; Type: regular 3'; Length: 13; Trimmed: 9452169 times
+
+No. of allowed errors:
+0-9 bp: 0; 10-13 bp: 1
+
+Bases preceding removed adapters:
+  A: 29.5%
+  C: 32.4%
+  G: 21.5%
+  T: 16.5%
+  none/other: 0.0%
+
+Overview of removed sequences
+length	count	expect	max.err	error counts
+1	6760285	7951857.5	0	6760285
+2	1967841	1987964.4	0	1967841
+3	471839	496991.1	0	471839
+4	100629	124247.8	0	100629
+5	23771	31061.9	0	23771
+6	3217	7765.5	0	3217
+7	1643	1941.4	0	1643
+8	1523	485.3	0	1523
+9	1498	121.3	0	1297 201
+10	1791	30.3	1	1342 449
+11	5475	7.6	1	4213 1262
+12	2382	1.9	1	2059 323
+13	3245	0.5	1	2787 458
+14	2267	0.5	1	2044 223
+15	2589	0.5	1	2248 341
+16	6188	0.5	1	5339 849
+17	15410	0.5	1	14133 1277
+18	54863	0.5	1	51131 3732
+19	3708	0.5	1	3437 271
+20	1264	0.5	1	1150 114
+21	969	0.5	1	910 59
+22	968	0.5	1	894 74
+23	1141	0.5	1	961 180
+24	982	0.5	1	803 179
+25	984	0.5	1	865 119
+26	875	0.5	1	700 175
+27	994	0.5	1	776 218
+28	638	0.5	1	611 27
+29	723	0.5	1	673 50
+30	571	0.5	1	540 31
+31	582	0.5	1	543 39
+32	616	0.5	1	604 12
+33	632	0.5	1	610 22
+34	594	0.5	1	569 25
+35	375	0.5	1	367 8
+36	522	0.5	1	502 20
+37	496	0.5	1	482 14
+38	493	0.5	1	478 15
+39	490	0.5	1	481 9
+40	525	0.5	1	510 15
+41	477	0.5	1	468 9
+42	405	0.5	1	393 12
+43	459	0.5	1	449 10
+44	346	0.5	1	337 9
+45	341	0.5	1	337 4
+46	264	0.5	1	258 6
+47	253	0.5	1	240 13
+48	241	0.5	1	235 6
+49	207	0.5	1	203 4
+50	383	0.5	1	367 16
+51	240	0.5	1	232 8
+52	147	0.5	1	144 3
+53	160	0.5	1	144 16
+54	69	0.5	1	55 14
+55	84	0.5	1	78 6
+56	61	0.5	1	54 7
+57	166	0.5	1	158 8
+58	148	0.5	1	143 5
+59	246	0.5	1	245 1
+60	235	0.5	1	232 3
+61	245	0.5	1	243 2
+62	170	0.5	1	162 8
+63	162	0.5	1	156 6
+64	72	0.5	1	61 11
+65	75	0.5	1	69 6
+66	95	0.5	1	90 5
+67	93	0.5	1	84 9
+68	83	0.5	1	71 12
+69	68	0.5	1	60 8
+70	65	0.5	1	56 9
+71	72	0.5	1	63 9
+72	81	0.5	1	69 12
+73	79	0.5	1	71 8
+74	63	0.5	1	56 7
+75	64	0.5	1	59 5
+76	21	0.5	1	15 6
+77	9	0.5	1	6 3
+78	7	0.5	1	4 3
+79	11	0.5	1	6 5
+80	12	0.5	1	2 10
+81	5	0.5	1	2 3
+82	7	0.5	1	3 4
+83	9	0.5	1	3 6
+84	9	0.5	1	3 6
+85	7	0.5	1	0 7
+86	11	0.5	1	4 7
+87	13	0.5	1	7 6
+88	9	0.5	1	4 5
+89	4	0.5	1	0 4
+90	6	0.5	1	0 6
+91	12	0.5	1	3 9
+
+RUN STATISTICS FOR INPUT FILE: /labs/khatrilab/solomonb/covid/isb/temp_fastq/INCOV113-AC_R2.fastq.gz
+=============================================
+31807430 sequences processed in total
+Sequences removed because they became shorter than the length cutoff of 20 bp:	111262 (0.3%)
+

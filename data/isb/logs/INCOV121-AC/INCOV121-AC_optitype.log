@@ -1,0 +1,72 @@
+
+mapping with 16 threads...
+
+ 0:00:01.55 Mapping INCOV121-AC.extracted.fq.gz to NUC reference...
+
+ 0:09:46.77 Generating binary hit matrix.
+0:09:46.80 Loading /labs/khatrilab/solomonb/covid/isb/optitype/INCOV121-AC_1.bam started. Number of HLA reads loaded (updated every thousand):
+1K...2K...3K...4K...5K...6K...7K...8K...9K...10K...11K...12K...13K...14K...15K...16K...17K...18K...19K...20K...21K...22K...23K...24K...25K...26K...27K...28K...29K...30K...31K...32K...33K...34K...35K...36K...37K...38K...39K...40K...41K...42K...43K...44K...45K...46K...47K...48K...49K...50K...51K...52K...53K...54K...55K...56K...57K...58K...59K...60K...61K...62K...63K...64K...65K...66K...67K...68K...69K...70K...71K...72K...73K...74K...75K...76K...77K...78K...79K...80K...81K...82K...83K...84K...85K...86K...87K...88K...89K...90K...91K...92K...93K...94K...95K...96K...97K...98K...99K...100K...101K...102K...103K...104K...105K...106K...107K...108K...109K...110K...111K...112K...113K...114K...115K...116K...117K...118K...119K...120K...121K...122K...123K...124K...125K...126K...127K...128K...129K...130K...131K...132K...133K...134K...135K...136K...137K...138K...139K...140K...141K...142K...143K...144K...145K...146K...147K...148K...149K...150K...151K...152K...153K...154K...155K...156K...157K...158K...159K...160K...161K...162K...163K...164K...165K...166K...167K...168K...169K...170K...171K...172K...173K...174K...175K...176K...177K...178K...179K...180K...181K...182K...183K...184K...185K...186K...187K...188K...189K...190K...191K...192K...
+ 0:11:10.05 192443 reads loaded. Creating dataframe...
+0:30:35.99 Dataframes created. Shape: 192443 x 7339, hits: 66925359 (67111920), sparsity: 1 in 21.04
+
+ 0:31:50.60 temporary pruning of identical rows and columns
+
+ 0:31:54.49 Size of mtx with unique rows and columns: (3247, 1877)
+0:31:54.49 determining minimal set of non-overshadowed alleles
+
+ 0:32:36.53 Keeping only the minimal number of required alleles (959,)
+
+ 0:32:37.61 Creating compact model...
+
+starting ilp solver with 1 threads...
+
+ 0:35:43.92 Initializing OptiType model...
+GLPSOL: GLPK LP/MIP Solver, v4.57
+Parameter(s) specified in the command line:
+ --write /tmp/tmpbGMkgY.glpk.raw --wglp /tmp/tmpzos7rs.glpk.glp --cpxlp /tmp/tmpkJM4OF.pyomo.lp
+Reading problem data from '/tmp/tmpkJM4OF.pyomo.lp'...
+/tmp/tmpkJM4OF.pyomo.lp:178259: warning: lower bound of variable 'x9463' redefined
+/tmp/tmpkJM4OF.pyomo.lp:178259: warning: upper bound of variable 'x9463' redefined
+9462 rows, 5685 columns, 139456 non-zeros
+3321 integer variables, all of which are binary
+181580 lines were read
+Writing problem data to '/tmp/tmpzos7rs.glpk.glp'...
+171156 lines were written
+GLPK Integer Optimizer, v4.57
+9462 rows, 5685 columns, 139456 non-zeros
+3321 integer variables, all of which are binary
+Preprocessing...
+1 hidden packing inequaliti(es) were detected
+2106 hidden covering inequaliti(es) were detected
+9454 rows, 5682 columns, 139443 non-zeros
+3319 integer variables, all of which are binary
+Scaling...
+ A: min|aij| =  1.000e+00  max|aij| =  6.000e+00  ratio =  6.000e+00
+Problem data seem to be well scaled
+Constructing initial basis...
+Size of triangular part is 9454
+Solving LP relaxation...
+GLPK Simplex Optimizer, v4.57
+9454 rows, 5682 columns, 139443 non-zeros
+      0: obj =  -0.000000000e+00 inf =   4.000e+00 (4)
+      4: obj =  -0.000000000e+00 inf =   0.000e+00 (0)
+*   500: obj =   1.267835577e+05 inf =   7.494e-15 (2255) 1
+*  1000: obj =   1.511621470e+05 inf =   1.191e-14 (1930)
+*  1500: obj =   1.548621020e+05 inf =   0.000e+00 (1541) 1
+*  2000: obj =   1.553493870e+05 inf =   0.000e+00 (1244)
+*  2500: obj =   1.555113870e+05 inf =   0.000e+00 (1068)
+*  3000: obj =   1.556909420e+05 inf =   0.000e+00 (898)
+*  3500: obj =   1.561029250e+05 inf =   0.000e+00 (400)
+*  3903: obj =   1.562921250e+05 inf =   0.000e+00 (0)
+OPTIMAL LP SOLUTION FOUND
+Integer optimization begins...
++  3903: mip =     not found yet <=              +inf        (1; 0)
++  3905: >>>>>   1.562920170e+05 <=   1.562920170e+05   0.0% (2; 0)
++  3905: mip =   1.562920170e+05 <=     tree is empty   0.0% (0; 3)
+INTEGER OPTIMAL SOLUTION FOUND
+Time used:   1.6 secs
+Memory used: 27.9 Mb (29248156 bytes)
+Writing MIP solution to '/tmp/tmpbGMkgY.glpk.raw'...
+15149 lines were written
+
+ 0:36:07.87 Result dataframe has been constructed...

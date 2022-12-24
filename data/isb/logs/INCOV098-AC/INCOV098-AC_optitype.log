@@ -1,0 +1,67 @@
+
+mapping with 16 threads...
+
+ 0:00:00.71 Mapping INCOV098-AC.extracted.fq.gz to NUC reference...
+
+ 0:02:37.47 Generating binary hit matrix.
+0:02:37.50 Loading /labs/khatrilab/solomonb/covid/isb/optitype/INCOV098-AC_1.bam started. Number of HLA reads loaded (updated every thousand):
+1K...2K...3K...4K...5K...6K...7K...8K...9K...10K...11K...12K...13K...14K...15K...16K...17K...18K...19K...20K...21K...22K...23K...24K...25K...26K...27K...28K...29K...30K...31K...32K...33K...34K...35K...36K...37K...38K...39K...
+ 0:02:53.19 39684 reads loaded. Creating dataframe...
+0:05:56.05 Dataframes created. Shape: 39684 x 7339, hits: 13545697 (13655879), sparsity: 1 in 21.33
+
+ 0:06:03.57 temporary pruning of identical rows and columns
+
+ 0:06:04.55 Size of mtx with unique rows and columns: (2127, 1821)
+0:06:04.55 determining minimal set of non-overshadowed alleles
+
+ 0:06:31.60 Keeping only the minimal number of required alleles (693,)
+
+ 0:06:31.76 Creating compact model...
+
+starting ilp solver with 1 threads...
+
+ 0:06:46.91 Initializing OptiType model...
+GLPSOL: GLPK LP/MIP Solver, v4.57
+Parameter(s) specified in the command line:
+ --write /tmp/tmpMNEZET.glpk.raw --wglp /tmp/tmpvstloe.glpk.glp --cpxlp /tmp/tmpNC72mN.pyomo.lp
+Reading problem data from '/tmp/tmpNC72mN.pyomo.lp'...
+/tmp/tmpNC72mN.pyomo.lp:65422: warning: lower bound of variable 'x4611' redefined
+/tmp/tmpNC72mN.pyomo.lp:65422: warning: upper bound of variable 'x4611' redefined
+4610 rows, 2995 columns, 46289 non-zeros
+1843 integer variables, all of which are binary
+67265 lines were read
+Writing problem data to '/tmp/tmpvstloe.glpk.glp'...
+61959 lines were written
+GLPK Integer Optimizer, v4.57
+4610 rows, 2995 columns, 46289 non-zeros
+1843 integer variables, all of which are binary
+Preprocessing...
+1061 hidden covering inequaliti(es) were detected
+4609 rows, 2994 columns, 46288 non-zeros
+1843 integer variables, all of which are binary
+Scaling...
+ A: min|aij| =  1.000e+00  max|aij| =  4.000e+00  ratio =  4.000e+00
+Problem data seem to be well scaled
+Constructing initial basis...
+Size of triangular part is 4609
+Solving LP relaxation...
+GLPK Simplex Optimizer, v4.57
+4609 rows, 2994 columns, 46288 non-zeros
+      0: obj =  -0.000000000e+00 inf =   4.000e+00 (4)
+      4: obj =  -0.000000000e+00 inf =   0.000e+00 (0)
+*   500: obj =   1.786915467e+04 inf =   5.181e-16 (939) 1
+*  1000: obj =   2.196506600e+04 inf =   3.312e-15 (579)
+*  1500: obj =   2.234243200e+04 inf =   0.000e+00 (225) 1
+*  1754: obj =   2.251825600e+04 inf =   0.000e+00 (0)
+OPTIMAL LP SOLUTION FOUND
+Integer optimization begins...
++  1754: mip =     not found yet <=              +inf        (1; 0)
++  1758: >>>>>   2.251813900e+04 <=   2.251822000e+04 < 0.1% (2; 0)
++  1763: mip =   2.251813900e+04 <=     tree is empty   0.0% (0; 3)
+INTEGER OPTIMAL SOLUTION FOUND
+Time used:   0.3 secs
+Memory used: 10.9 Mb (11382168 bytes)
+Writing MIP solution to '/tmp/tmpMNEZET.glpk.raw'...
+7607 lines were written
+
+ 0:06:53.09 Result dataframe has been constructed...

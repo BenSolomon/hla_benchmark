@@ -1,0 +1,187 @@
+Using an excessive number of cores has a diminishing return! It is recommended not to exceed 8 cores per trimming process (you asked for 8 cores). Please consider re-specifying
+Path to Cutadapt set as: 'cutadapt' (default)
+Cutadapt seems to be working fine (tested command 'cutadapt --version')
+Cutadapt version: 2.10
+Could not detect version of Python used by Cutadapt from the first line of Cutadapt (but found this: >>>#!/bin/sh<<<)
+Letting the (modified) Cutadapt deal with the Python version instead
+Parallel gzip (pigz) detected. Proceeding with multicore (de)compression using 8 cores
+
+No quality encoding type selected. Assuming that the data provided uses Sanger encoded Phred scores (default)
+
+Output will be written into the directory: /labs/khatrilab/solomonb/covid/isb/temp_fastq/
+
+
+AUTO-DETECTING ADAPTER TYPE
+===========================
+Attempting to auto-detect adapter type from the first 1 million sequences of the first file (>> /labs/khatrilab/solomonb/covid/isb/temp_fastq/INCOV024-BL_R2.fastq.gz <<)
+
+Found perfect matches for the following adapter sequences:
+Adapter type	Count	Sequence	Sequences analysed	Percentage
+Illumina	1269	AGATCGGAAGAGC	1000000	0.13
+smallRNA	13	TGGAATTCTCGG	1000000	0.00
+Nextera	5	CTGTCTCTTATA	1000000	0.00
+Using Illumina adapter for trimming (count: 1269). Second best hit was smallRNA (count: 13)
+
+Writing report to '/labs/khatrilab/solomonb/covid/isb/temp_fastq/INCOV024-BL_R2.fastq.gz_trimming_report.txt'
+
+SUMMARISING RUN PARAMETERS
+==========================
+Input filename: /labs/khatrilab/solomonb/covid/isb/temp_fastq/INCOV024-BL_R2.fastq.gz
+Trimming mode: single-end
+Trim Galore version: 0.6.4_dev
+Cutadapt version: 2.10
+Python version: could not detect
+Number of cores used for trimming: 8
+Quality Phred score cutoff: 20
+Quality encoding type selected: ASCII+33
+Adapter sequence: 'AGATCGGAAGAGC' (Illumina TruSeq, Sanger iPCR; auto-detected)
+Maximum trimming error rate: 0.1 (default)
+Minimum required adapter overlap (stringency): 1 bp
+Minimum required sequence length before a sequence gets removed: 20 bp
+Output file(s) will be GZIP compressed
+
+Cutadapt seems to be fairly up-to-date (version 2.10). Setting -j 8
+Writing final adapter and quality trimmed output to INCOV024-BL_R2_trimmed.fq.gz
+
+
+  >>> Now performing quality (cutoff '-q 20') and adapter trimming in a single pass for the adapter sequence: 'AGATCGGAAGAGC' from file /labs/khatrilab/solomonb/covid/isb/temp_fastq/INCOV024-BL_R2.fastq.gz <<< 
+10000000 sequences processed
+20000000 sequences processed
+30000000 sequences processed
+40000000 sequences processed
+50000000 sequences processed
+60000000 sequences processed
+70000000 sequences processed
+80000000 sequences processed
+90000000 sequences processed
+100000000 sequences processed
+110000000 sequences processed
+120000000 sequences processed
+This is cutadapt 2.10 with Python 3.7.8
+Command line parameters: -j 8 -e 0.1 -q 20 -O 1 -a AGATCGGAAGAGC /labs/khatrilab/solomonb/covid/isb/temp_fastq/INCOV024-BL_R2.fastq.gz
+Processing reads on 8 cores in single-end mode ...
+Finished in 555.71 s (4 us/read; 13.52 M reads/minute).
+
+=== Summary ===
+
+Total reads processed:             125,209,204
+Reads with adapters:                36,959,277 (29.5%)
+Reads written (passing filters):   125,209,204 (100.0%)
+
+Total basepairs processed: 11,394,037,564 bp
+Quality-trimmed:              97,280,138 bp (0.9%)
+Total written (filtered):  11,242,151,922 bp (98.7%)
+
+=== Adapter 1 ===
+
+Sequence: AGATCGGAAGAGC; Type: regular 3'; Length: 13; Trimmed: 36959277 times
+
+No. of allowed errors:
+0-9 bp: 0; 10-13 bp: 1
+
+Bases preceding removed adapters:
+  A: 30.3%
+  C: 32.4%
+  G: 21.3%
+  T: 16.0%
+  none/other: 0.0%
+
+Overview of removed sequences
+length	count	expect	max.err	error counts
+1	26635587	31302301.0	0	26635587
+2	7768175	7825575.2	0	7768175
+3	1813903	1956393.8	0	1813903
+4	385884	489098.5	0	385884
+5	88276	122274.6	0	88276
+6	10310	30568.7	0	10310
+7	3961	7642.2	0	3961
+8	2937	1910.5	0	2937
+9	3341	477.6	0	2431 910
+10	4278	119.4	1	2431 1847
+11	13465	29.9	1	9362 4103
+12	4868	7.5	1	3956 912
+13	8292	1.9	1	6698 1594
+14	4509	1.9	1	3820 689
+15	5967	1.9	1	4873 1094
+16	14751	1.9	1	12168 2583
+17	31050	1.9	1	27560 3490
+18	114062	1.9	1	102023 12039
+19	6565	1.9	1	6026 539
+20	2061	1.9	1	1886 175
+21	1760	1.9	1	1640 120
+22	1754	1.9	1	1618 136
+23	1917	1.9	1	1608 309
+24	1571	1.9	1	1376 195
+25	1757	1.9	1	1536 221
+26	1389	1.9	1	1181 208
+27	1724	1.9	1	1395 329
+28	1143	1.9	1	1080 63
+29	1321	1.9	1	1223 98
+30	1157	1.9	1	1096 61
+31	1189	1.9	1	1102 87
+32	1037	1.9	1	987 50
+33	1101	1.9	1	1034 67
+34	1132	1.9	1	1062 70
+35	718	1.9	1	681 37
+36	944	1.9	1	883 61
+37	904	1.9	1	868 36
+38	815	1.9	1	782 33
+39	831	1.9	1	796 35
+40	897	1.9	1	856 41
+41	812	1.9	1	772 40
+42	775	1.9	1	730 45
+43	744	1.9	1	709 35
+44	648	1.9	1	623 25
+45	533	1.9	1	509 24
+46	542	1.9	1	521 21
+47	418	1.9	1	388 30
+48	432	1.9	1	406 26
+49	412	1.9	1	386 26
+50	686	1.9	1	653 33
+51	447	1.9	1	418 29
+52	285	1.9	1	253 32
+53	300	1.9	1	263 37
+54	144	1.9	1	122 22
+55	163	1.9	1	127 36
+56	110	1.9	1	87 23
+57	272	1.9	1	250 22
+58	193	1.9	1	169 24
+59	453	1.9	1	427 26
+60	362	1.9	1	332 30
+61	503	1.9	1	468 35
+62	269	1.9	1	249 20
+63	372	1.9	1	341 31
+64	152	1.9	1	119 33
+65	156	1.9	1	126 30
+66	154	1.9	1	136 18
+67	163	1.9	1	135 28
+68	142	1.9	1	113 29
+69	118	1.9	1	93 25
+70	103	1.9	1	81 22
+71	120	1.9	1	101 19
+72	108	1.9	1	93 15
+73	87	1.9	1	72 15
+74	114	1.9	1	85 29
+75	124	1.9	1	95 29
+76	46	1.9	1	23 23
+77	30	1.9	1	9 21
+78	32	1.9	1	12 20
+79	39	1.9	1	12 27
+80	29	1.9	1	11 18
+81	36	1.9	1	9 27
+82	29	1.9	1	9 20
+83	42	1.9	1	11 31
+84	26	1.9	1	6 20
+85	29	1.9	1	15 14
+86	29	1.9	1	12 17
+87	44	1.9	1	17 27
+88	38	1.9	1	8 30
+89	29	1.9	1	7 22
+90	19	1.9	1	5 14
+91	61	1.9	1	10 51
+
+RUN STATISTICS FOR INPUT FILE: /labs/khatrilab/solomonb/covid/isb/temp_fastq/INCOV024-BL_R2.fastq.gz
+=============================================
+125209204 sequences processed in total
+Sequences removed because they became shorter than the length cutoff of 20 bp:	493067 (0.4%)
+

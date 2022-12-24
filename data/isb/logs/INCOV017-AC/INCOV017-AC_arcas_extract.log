@@ -1,0 +1,36 @@
+
+--------------------------------------------------------------------------------
+[log] Date: 2021-02-19
+[log] Sample: INCOV017-AC
+[log] Input file: /labs/khatrilab/solomonb/covid/isb/bam/INCOV017-AC.bam
+[log] Read type: single-end
+--------------------------------------------------------------------------------
+[extract] Extracting reads from /labs/khatrilab/solomonb/covid/isb/bam/INCOV017-AC.bam
+[extract] Extracting chromosome 6: 
+
+	samtools view -H -@8 /labs/khatrilab/solomonb/covid/isb/bam/INCOV017-AC.bam -o /tmp/arcas_f09f8427-3dbb-4910-bdfc-aeba2639739b/INCOV017-AC.hla.sam
+
+[extract] Extracting chromosome 6: 
+
+	samtools view -@8 -F 4 /labs/khatrilab/solomonb/covid/isb/bam/INCOV017-AC.bam 6 >> /tmp/arcas_f09f8427-3dbb-4910-bdfc-aeba2639739b/INCOV017-AC.hla.sam
+
+	[main_samview] region "6" specifies an unknown reference name. Continue anyway.
+	
+[extract] Extracting unmapped reads: 
+
+	samtools view -@8 -f 4 /labs/khatrilab/solomonb/covid/isb/bam/INCOV017-AC.bam >> /tmp/arcas_f09f8427-3dbb-4910-bdfc-aeba2639739b/INCOV017-AC.hla.sam
+
+[extract] Converting SAM to BAM: 
+
+	samtools view -Sb -@8 /tmp/arcas_f09f8427-3dbb-4910-bdfc-aeba2639739b/INCOV017-AC.hla.sam > /tmp/arcas_f09f8427-3dbb-4910-bdfc-aeba2639739b/INCOV017-AC.hla.bam
+
+[extract] Sorting bam: 
+
+	samtools sort -n -@8 /tmp/arcas_f09f8427-3dbb-4910-bdfc-aeba2639739b/INCOV017-AC.hla.bam -o /tmp/arcas_f09f8427-3dbb-4910-bdfc-aeba2639739b/INCOV017-AC.hla.sorted.bam
+
+[extract] Converting bam to fastq: 
+
+	bedtools bamtofastq -i /tmp/arcas_f09f8427-3dbb-4910-bdfc-aeba2639739b/INCOV017-AC.hla.sorted.bam -fq /labs/khatrilab/solomonb/covid/isb/arcasHLA/INCOV017-AC.extracted.fq
+
+--------------------------------------------------------------------------------
+

@@ -1,0 +1,66 @@
+
+mapping with 16 threads...
+
+ 0:00:00.74 Mapping INCOV044-AC.extracted.fq.gz to NUC reference...
+
+ 0:01:46.25 Generating binary hit matrix.
+0:01:46.28 Loading /labs/khatrilab/solomonb/covid/isb/optitype/INCOV044-AC_1.bam started. Number of HLA reads loaded (updated every thousand):
+1K...2K...3K...4K...5K...6K...7K...8K...9K...10K...11K...12K...13K...14K...15K...16K...17K...18K...19K...20K...21K...22K...23K...24K...25K...26K...27K...28K...29K...30K...31K...
+ 0:02:00.65 31893 reads loaded. Creating dataframe...
+0:04:11.22 Dataframes created. Shape: 31893 x 7339, hits: 12785211 (12896207), sparsity: 1 in 18.15
+
+ 0:04:24.09 temporary pruning of identical rows and columns
+
+ 0:04:24.58 Size of mtx with unique rows and columns: (1314, 1337)
+0:04:24.58 determining minimal set of non-overshadowed alleles
+
+ 0:04:34.70 Keeping only the minimal number of required alleles (462,)
+
+ 0:04:34.72 Creating compact model...
+
+starting ilp solver with 1 threads...
+
+ 0:04:43.28 Initializing OptiType model...
+GLPSOL: GLPK LP/MIP Solver, v4.57
+Parameter(s) specified in the command line:
+ --write /tmp/tmpuY9EM0.glpk.raw --wglp /tmp/tmpgVIpxO.glpk.glp --cpxlp /tmp/tmpHj978L.pyomo.lp
+Reading problem data from '/tmp/tmpHj978L.pyomo.lp'...
+/tmp/tmpHj978L.pyomo.lp:39053: warning: lower bound of variable 'x3019' redefined
+/tmp/tmpHj978L.pyomo.lp:39053: warning: upper bound of variable 'x3019' redefined
+3018 rows, 1968 columns, 26519 non-zeros
+1214 integer variables, all of which are binary
+40267 lines were read
+Writing problem data to '/tmp/tmpgVIpxO.glpk.glp'...
+36784 lines were written
+GLPK Integer Optimizer, v4.57
+3018 rows, 1968 columns, 26519 non-zeros
+1214 integer variables, all of which are binary
+Preprocessing...
+661 hidden covering inequaliti(es) were detected
+3017 rows, 1967 columns, 26518 non-zeros
+1214 integer variables, all of which are binary
+Scaling...
+ A: min|aij| =  1.000e+00  max|aij| =  4.000e+00  ratio =  4.000e+00
+Problem data seem to be well scaled
+Constructing initial basis...
+Size of triangular part is 3017
+Solving LP relaxation...
+GLPK Simplex Optimizer, v4.57
+3017 rows, 1967 columns, 26518 non-zeros
+      0: obj =  -0.000000000e+00 inf =   4.000e+00 (4)
+      4: obj =  -0.000000000e+00 inf =   0.000e+00 (0)
+*   500: obj =   2.556805600e+04 inf =   0.000e+00 (553) 1
+*  1000: obj =   2.625117300e+04 inf =   2.276e-15 (290)
+*  1338: obj =   2.649190700e+04 inf =   1.377e-14 (0)
+OPTIMAL LP SOLUTION FOUND
+Integer optimization begins...
++  1338: mip =     not found yet <=              +inf        (1; 0)
++  1340: >>>>>   2.649187100e+04 <=   2.649188900e+04 < 0.1% (2; 0)
++  1342: mip =   2.649187100e+04 <=     tree is empty   0.0% (0; 3)
+INTEGER OPTIMAL SOLUTION FOUND
+Time used:   0.2 secs
+Memory used: 6.6 Mb (6937309 bytes)
+Writing MIP solution to '/tmp/tmpuY9EM0.glpk.raw'...
+4988 lines were written
+
+ 0:04:46.10 Result dataframe has been constructed...

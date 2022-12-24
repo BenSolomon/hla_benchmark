@@ -1,0 +1,72 @@
+
+mapping with 16 threads...
+
+ 0:00:00.87 Mapping INCOV100-BL.extracted.fq.gz to NUC reference...
+
+ 0:07:41.33 Generating binary hit matrix.
+0:07:41.36 Loading /labs/khatrilab/solomonb/covid/isb/optitype/INCOV100-BL_1.bam started. Number of HLA reads loaded (updated every thousand):
+1K...2K...3K...4K...5K...6K...7K...8K...9K...10K...11K...12K...13K...14K...15K...16K...17K...18K...19K...20K...21K...22K...23K...24K...25K...26K...27K...28K...29K...30K...31K...32K...33K...34K...35K...36K...37K...38K...39K...40K...41K...42K...43K...44K...45K...46K...47K...48K...49K...50K...51K...52K...53K...54K...55K...56K...57K...58K...59K...60K...61K...62K...63K...64K...65K...66K...67K...68K...69K...70K...71K...72K...73K...74K...75K...76K...77K...78K...79K...80K...81K...82K...83K...84K...85K...86K...87K...88K...89K...90K...91K...92K...93K...94K...95K...96K...97K...98K...99K...100K...101K...102K...103K...104K...105K...106K...107K...108K...109K...110K...111K...112K...113K...114K...115K...116K...117K...118K...119K...120K...121K...122K...123K...124K...125K...126K...127K...128K...129K...130K...131K...132K...133K...134K...135K...136K...137K...138K...139K...140K...141K...142K...143K...144K...145K...146K...147K...148K...149K...150K...151K...152K...153K...154K...155K...156K...157K...158K...159K...160K...
+ 0:08:49.26 160003 reads loaded. Creating dataframe...
+0:26:09.47 Dataframes created. Shape: 160003 x 7339, hits: 52408928 (52655187), sparsity: 1 in 22.30
+
+ 0:27:13.47 temporary pruning of identical rows and columns
+
+ 0:27:16.24 Size of mtx with unique rows and columns: (3522, 1996)
+0:27:16.24 determining minimal set of non-overshadowed alleles
+
+ 0:28:12.41 Keeping only the minimal number of required alleles (991,)
+
+ 0:28:13.30 Creating compact model...
+
+starting ilp solver with 1 threads...
+
+ 0:31:02.90 Initializing OptiType model...
+GLPSOL: GLPK LP/MIP Solver, v4.57
+Parameter(s) specified in the command line:
+ --write /tmp/tmpqgeF0O.glpk.raw --wglp /tmp/tmpK3WzQc.glpk.glp --cpxlp /tmp/tmpnmDaKA.pyomo.lp
+Reading problem data from '/tmp/tmpnmDaKA.pyomo.lp'...
+/tmp/tmpnmDaKA.pyomo.lp:166316: warning: lower bound of variable 'x9685' redefined
+/tmp/tmpnmDaKA.pyomo.lp:166316: warning: upper bound of variable 'x9685' redefined
+9684 rows, 5829 columns, 126591 non-zeros
+3409 integer variables, all of which are binary
+169725 lines were read
+Writing problem data to '/tmp/tmpK3WzQc.glpk.glp'...
+159047 lines were written
+GLPK Integer Optimizer, v4.57
+9684 rows, 5829 columns, 126591 non-zeros
+3409 integer variables, all of which are binary
+Preprocessing...
+1 hidden packing inequaliti(es) were detected
+2182 hidden covering inequaliti(es) were detected
+9682 rows, 5828 columns, 126588 non-zeros
+3409 integer variables, all of which are binary
+Scaling...
+ A: min|aij| =  1.000e+00  max|aij| =  5.000e+00  ratio =  5.000e+00
+Problem data seem to be well scaled
+Constructing initial basis...
+Size of triangular part is 9682
+Solving LP relaxation...
+GLPK Simplex Optimizer, v4.57
+9682 rows, 5828 columns, 126588 non-zeros
+      0: obj =  -0.000000000e+00 inf =   5.000e+00 (5)
+      5: obj =  -0.000000000e+00 inf =   0.000e+00 (0)
+*   500: obj =   7.237166375e+04 inf =   0.000e+00 (2212) 1
+*  1000: obj =   9.124465800e+04 inf =   4.108e-15 (1896) 1
+*  1500: obj =   9.599808800e+04 inf =   3.468e-14 (1517)
+*  2000: obj =   9.690847300e+04 inf =   0.000e+00 (1148) 1
+*  2500: obj =   9.713358100e+04 inf =   2.554e-15 (886)
+*  3000: obj =   9.724038100e+04 inf =   2.554e-15 (654)
+*  3500: obj =   9.766499900e+04 inf =   5.290e-14 (168)
+*  3668: obj =   9.776120200e+04 inf =   1.998e-15 (0)
+OPTIMAL LP SOLUTION FOUND
+Integer optimization begins...
++  3668: mip =     not found yet <=              +inf        (1; 0)
++  3668: >>>>>   9.776120200e+04 <=   9.776120200e+04   0.0% (1; 0)
++  3668: mip =   9.776120200e+04 <=     tree is empty   0.0% (0; 1)
+INTEGER OPTIMAL SOLUTION FOUND
+Time used:   1.2 secs
+Memory used: 25.9 Mb (27186668 bytes)
+Writing MIP solution to '/tmp/tmpqgeF0O.glpk.raw'...
+15515 lines were written
+
+ 0:31:22.78 Result dataframe has been constructed...

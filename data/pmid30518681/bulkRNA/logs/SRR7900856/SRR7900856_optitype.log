@@ -1,0 +1,78 @@
+
+mapping with 16 threads...
+
+ 0:00:00.85 Mapping SRR7900856.extracted.1.fq.gz to NUC reference...
+
+ 0:02:15.17 Mapping SRR7900856.extracted.2.fq.gz to NUC reference...
+
+ 0:03:48.67 Generating binary hit matrix.
+0:03:48.69 Loading /labs/khatrilab/solomonb/covid/pmid30518681/bulkRNA/optitype/SRR7900856_1.bam started. Number of HLA reads loaded (updated every thousand):
+1K...2K...3K...4K...5K...6K...7K...8K...9K...10K...11K...12K...13K...14K...15K...16K...17K...18K...19K...20K...21K...22K...23K...24K...25K...26K...27K...28K...29K...30K...31K...32K...33K...
+ 0:04:00.92 33638 reads loaded. Creating dataframe...
+0:07:01.28 Dataframes created. Shape: 33638 x 7339, hits: 12885229 (12915347), sparsity: 1 in 19.11
+0:07:04.92 Loading /labs/khatrilab/solomonb/covid/pmid30518681/bulkRNA/optitype/SRR7900856_2.bam started. Number of HLA reads loaded (updated every thousand):
+1K...2K...3K...4K...5K...6K...7K...8K...9K...10K...11K...12K...13K...14K...15K...16K...17K...18K...19K...20K...21K...22K...23K...24K...25K...26K...27K...28K...29K...30K...31K...32K...33K...34K...35K...36K...
+ 0:07:17.84 36624 reads loaded. Creating dataframe...
+0:09:49.29 Dataframes created. Shape: 36624 x 7339, hits: 13605223 (13640480), sparsity: 1 in 19.70
+0:09:57.98 Alignment pairing completed. 27409 paired, 14866 unpaired, 289 discordant 
+
+ 0:10:00.54 temporary pruning of identical rows and columns
+
+ 0:10:01.09 Size of mtx with unique rows and columns: (4295, 1351)
+0:10:01.09 determining minimal set of non-overshadowed alleles
+
+ 0:10:28.16 Keeping only the minimal number of required alleles (391,)
+
+ 0:10:28.22 Creating compact model...
+
+starting ilp solver with 1 threads...
+
+ 0:10:33.77 Initializing OptiType model...
+GLPSOL: GLPK LP/MIP Solver, v4.57
+Parameter(s) specified in the command line:
+ --write /tmp/tmpRFLGqq.glpk.raw --wglp /tmp/tmpFbD8MJ.glpk.glp --cpxlp /tmp/tmpxN5adK.pyomo.lp
+Reading problem data from '/tmp/tmpxN5adK.pyomo.lp'...
+/tmp/tmpxN5adK.pyomo.lp:75344: warning: lower bound of variable 'x6341' redefined
+/tmp/tmpxN5adK.pyomo.lp:75344: warning: upper bound of variable 'x6341' redefined
+6340 rows, 3557 columns, 49595 non-zeros
+1973 integer variables, all of which are binary
+77317 lines were read
+Writing problem data to '/tmp/tmpFbD8MJ.glpk.glp'...
+70583 lines were written
+GLPK Integer Optimizer, v4.57
+6340 rows, 3557 columns, 49595 non-zeros
+1973 integer variables, all of which are binary
+Preprocessing...
+1 hidden packing inequaliti(es) were detected
+1500 hidden covering inequaliti(es) were detected
+6335 rows, 3555 columns, 49587 non-zeros
+1972 integer variables, all of which are binary
+Scaling...
+ A: min|aij| =  1.000e+00  max|aij| =  5.000e+00  ratio =  5.000e+00
+Problem data seem to be well scaled
+Constructing initial basis...
+Size of triangular part is 6335
+Solving LP relaxation...
+GLPK Simplex Optimizer, v4.57
+6335 rows, 3555 columns, 49587 non-zeros
+      0: obj =  -0.000000000e+00 inf =   4.000e+00 (4)
+      4: obj =  -0.000000000e+00 inf =   0.000e+00 (0)
+*   500: obj =   1.326845500e+04 inf =   9.356e-14 (1461)
+*  1000: obj =   1.641065250e+04 inf =   0.000e+00 (1337) 2
+*  1500: obj =   1.838712600e+04 inf =   1.586e-14 (1172)
+*  2000: obj =   1.967405500e+04 inf =   1.488e-14 (904) 1
+*  2500: obj =   1.999878900e+04 inf =   2.232e-14 (715)
+*  3000: obj =   2.064513300e+04 inf =   7.105e-14 (237)
+*  3242: obj =   2.078036100e+04 inf =   4.441e-16 (0)
+OPTIMAL LP SOLUTION FOUND
+Integer optimization begins...
++  3242: mip =     not found yet <=              +inf        (1; 0)
++  3242: >>>>>   2.078036100e+04 <=   2.078036100e+04   0.0% (1; 0)
++  3242: mip =   2.078036100e+04 <=     tree is empty   0.0% (0; 1)
+INTEGER OPTIMAL SOLUTION FOUND
+Time used:   0.8 secs
+Memory used: 12.5 Mb (13056549 bytes)
+Writing MIP solution to '/tmp/tmpRFLGqq.glpk.raw'...
+9899 lines were written
+
+ 0:10:39.04 Result dataframe has been constructed...

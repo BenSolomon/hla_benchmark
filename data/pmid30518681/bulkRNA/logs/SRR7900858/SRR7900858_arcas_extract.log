@@ -1,0 +1,36 @@
+
+--------------------------------------------------------------------------------
+[log] Date: 2021-02-18
+[log] Sample: SRR7900858
+[log] Input file: /labs/khatrilab/solomonb/covid/pmid30518681/bulkRNA/bam/SRR7900858.bam
+[log] Read type: paired-end
+--------------------------------------------------------------------------------
+[extract] Extracting reads from /labs/khatrilab/solomonb/covid/pmid30518681/bulkRNA/bam/SRR7900858.bam
+[extract] Extracting chromosome 6: 
+
+	samtools view -H -@8 /labs/khatrilab/solomonb/covid/pmid30518681/bulkRNA/bam/SRR7900858.bam -o /tmp/arcas_90b32fab-e6be-4da6-8bb1-71c6298a274d/SRR7900858.hla.sam
+
+[extract] Extracting chromosome 6: 
+
+	samtools view -@8 -f 2 /labs/khatrilab/solomonb/covid/pmid30518681/bulkRNA/bam/SRR7900858.bam 6 >> /tmp/arcas_90b32fab-e6be-4da6-8bb1-71c6298a274d/SRR7900858.hla.sam
+
+[extract] Extracting unmapped reads: 
+
+	samtools view -@8 -f 12 /labs/khatrilab/solomonb/covid/pmid30518681/bulkRNA/bam/SRR7900858.bam >> /tmp/arcas_90b32fab-e6be-4da6-8bb1-71c6298a274d/SRR7900858.hla.sam
+
+[extract] Converting SAM to BAM: 
+
+	samtools view -Sb -@8 /tmp/arcas_90b32fab-e6be-4da6-8bb1-71c6298a274d/SRR7900858.hla.sam > /tmp/arcas_90b32fab-e6be-4da6-8bb1-71c6298a274d/SRR7900858.hla.bam
+
+[extract] Sorting bam: 
+
+	samtools sort -n -@8 /tmp/arcas_90b32fab-e6be-4da6-8bb1-71c6298a274d/SRR7900858.hla.bam -o /tmp/arcas_90b32fab-e6be-4da6-8bb1-71c6298a274d/SRR7900858.hla.sorted.bam
+
+	[bam_sort_core] merging from 0 files and 8 in-memory blocks...
+	
+[extract] Converting bam to fastq: 
+
+	bedtools bamtofastq -i /tmp/arcas_90b32fab-e6be-4da6-8bb1-71c6298a274d/SRR7900858.hla.sorted.bam -fq /labs/khatrilab/solomonb/covid/pmid30518681/bulkRNA/arcasHLA/SRR7900858.extracted.1.fq -fq2 /labs/khatrilab/solomonb/covid/pmid30518681/bulkRNA/arcasHLA/SRR7900858.extracted.2.fq
+
+--------------------------------------------------------------------------------
+
