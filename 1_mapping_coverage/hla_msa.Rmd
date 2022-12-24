@@ -1,0 +1,282 @@
+---
+title: "HLA allele multiple sequence alignment"
+output: 
+  html_notebook:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    code_folding: hide
+---
+
+```{r, message = F}
+# library(msa)
+library(DECIPHER)
+library(vegan)
+library(tidyverse)
+library(cowplot)
+library(here)
+```
+
+# HLA sequence alignment
+
+### Load HLA reference sequences
+```{r}
+fas <- here("references/hla_nuc.fasta")
+seqs <- readDNAStringSet(fas)
+# seqs
+```
+### Find all HLA exon sequences
+```{r}
+imgt_path = here("references/alignments")
+hla_alignments <- tibble(loci = c("A","B","C","DPA1","DPB1","DQA1", "DQB1", "DRB")) %>% 
+  mutate(sequences = map(loci, function(x) tibble(lines = read_lines(sprintf("%s/%s_nuc.txt", imgt_path, x))))) %>% 
+  mutate(loci = gsub("DRB", "DRB1", loci))
+  
+parse_exons <- function(df, loci){
+  df %>% 
+  mutate(lines = trimws(lines, which = "left")) %>% 
+  filter(grepl(sprintf("^%s\\*", loci), lines)) %>% 
+  separate(lines, into = c("allele", "sequence"), sep = " ", extra = "merge") %>% 
+  filter(allele == .$allele[1]) %>% 
+  mutate(sequence = gsub("\\.| ", "",sequence)) %>% 
+  group_by(allele) %>% 
+  summarise(sequence = paste(c(sequence), collapse = "")) %>% 
+  mutate(sequence = str_split(sequence, "\\|")) %>% 
+  unnest(sequence) %>% 
+  mutate(exon = 1:n()) %>% 
+  select(exon, sequence)
+}
+
+hla_exons <- hla_alignments %>% 
+  mutate(sequences = map2(sequences, loci, parse_exons))
+```
+
+### Function to convert exon dataframe to a DNAstringset
+
+```{r}
+exon_df_to_set <- function(df){
+  exons <- df %>%
+    column_to_rownames("exon") %>%
+    pull(sequence) %>%
+    DNAStringSet() %>%
+    .[1:length(.) - 1]
+  names(exons) <-
+    paste("Exon_", 1:length(exons), sep = "")
+  return(exons)
+}
+
+exon_df_to_set(hla_exons$sequences[[1]])
+```
+
+### Function to filter HLA references sequences
+
+- Start/stop codons
+    - Currently inactive
+    - Might consider removing the start/stop codon requirement if mismatches arent included as a possible nucleotide state for shannon
+- Unique sequences
+- Don't have an expression suffix (N, Q, L, S, C, A)
+
+```{r, message=F, warning=F, error=F}
+sequence_filter <- function(sequences){
+  allele_ids <- tibble(id = names(sequences)) %>% 
+    separate(id, into = c("id","allele", "length"), sep = " ", extra = "merge") %>% 
+    mutate(valid_allele = !grepl(pattern = "[A-Z]$",allele))
+  sequences[(subseq(sequences, 1, 3) == "ATG") &
+            # (grepl(pattern = "TGA|TAA|TAG", subseq(sequences, -3, -1))) &
+            allele_ids$valid_allele]
+  }
+# hlaA <- seqs[grepl(" A\\*", names(seqs))] %>% sequence_filter() %>% unique() %>% AlignSeqs()
+# hlaB <- seqs[grepl(" B\\*", names(seqs))] %>% sequence_filter() %>% unique() %>% AlignSeqs()
+# hlaC <- seqs[grepl(" C\\*", names(seqs))] %>% sequence_filter() %>% unique() %>% AlignSeqs()
+# hlaDPA1 <- seqs[grepl(" DPA1\\*", names(seqs))] %>% sequence_filter() %>% unique() %>% AlignSeqs()
+# hlaDPB1 <- seqs[grepl(" DPB1\\*", names(seqs))] %>% sequence_filter() %>% unique() %>% AlignSeqs()
+# hlaDQA1 <- seqs[grepl(" DQA1\\*", names(seqs))] %>% sequence_filter() %>% unique() %>% AlignSeqs()
+# hlaDQB1 <- seqs[grepl(" DQB1\\*", names(seqs))] %>% sequence_filter() %>% unique() %>% AlignSeqs()
+# hlaDRB1 <- seqs[grepl(" DRB1\\*", names(seqs))] %>% sequence_filter() %>% unique() %>% AlignSeqs()
+```
+
+
+### Create HLA sequence sets with valid alleles and exon scaffold
+```{r}
+hla_sequences <- hla_exons %>% 
+  mutate(exons = sequences) %>% 
+  mutate(exons = map(exons, exon_df_to_set)) %>% 
+  mutate(sequences = map(loci, function(x) seqs[grepl(sprintf(" %s\\*", x), names(seqs))])) %>% 
+  mutate(sequences = map(sequences, function(x) x %>% sequence_filter() %>% unique())) %>% 
+  mutate(sequences = map2(sequences, exons, function(x,y) append(x,y)))
+hla_sequences$sequences[[8]]
+```
+
+### Align sequences
+```{r, message=F}
+hla_aligned <- hla_sequences %>% 
+  mutate(alignment = map(sequences, AlignSeqs))
+```
+
+### Find exon positions in alignment
+```{r}
+hla_match <- hla_aligned %>%
+  filter(loci != "DQB1") %>% #Filtered because of database inconsistencies with exon 5
+  mutate(ranges = map2(alignment, exons,  function(a,e){
+    lapply(e, function(x) matchPattern(pattern = subseq(x, -20, -1), subject = a[[1]], with.indels = T))
+    # lapply(e, function(x) print(x))
+    }))
+
+get_exon_ranges <- function(match_output, allele_length) {
+  exon_df <- tibble(range = lapply(match_output, function(x)
+    as.data.frame(x@ranges))) %>%
+    mutate(exon = 1:n()) %>%
+    unnest(range) %>% 
+    mutate(start = lag(end, default = 0) + 1) %>% 
+    select(exon, start, end)
+  
+  bind_rows(
+    exon_df,
+    tribble( ~start, ~ end, max(exon_df$end), allele_length) %>%
+      mutate(
+        exon = max(exon_df$exon + 1)
+      )
+  ) %>% 
+  rowwise() %>% 
+  mutate(center = round(mean(c(start, end))))
+}
+
+hla_match <- hla_match %>% 
+  mutate(bp = map_dbl(alignment, function(x) max(sapply(x, nchar)))) %>% 
+  mutate(ranges = map2(ranges, bp, get_exon_ranges))
+```
+
+### Convert alignment positions to nucleotide tallies
+```{r}
+position_tally <- function(alignment){
+  as_tibble(as.matrix(alignment)) %>% 
+  pivot_longer(cols = everything(), names_to = "position", values_to = "nucleotide") %>% 
+  group_by(position) %>% 
+  count(nucleotide) %>% 
+  pivot_wider(names_from = "position", values_from = "n", values_fill = 0) %>% 
+  filter(grepl("[ACGT]", nucleotide)) %>% 
+  column_to_rownames("nucleotide")
+}
+
+hla_tally <- hla_match %>% 
+  mutate(tally = map(alignment, function(x){
+    x[!grepl("Exon", names(x))] %>% 
+      position_tally()
+    }))
+```
+
+### Calculate shannon entropy by position
+```{r}
+position_shannon <- function(tally){
+  diversity(tally, MARGIN = 2, base = 2) %>% 
+  enframe(name = "position", value = "shannon") %>% 
+  mutate(position = as.numeric(gsub("V", "", position))) %>% 
+  arrange(position)
+}
+
+hla_entropy <- hla_tally %>% 
+  mutate(entropy = map(tally, position_shannon))
+
+# saveRDS(hla_entropy, "/labs/khatrilab/solomonb/hla_project/hla_benchmark/hla_sequence_entropy_includeIncomplete.RDS")
+```
+
+```{r}
+## Version where only sequences with all exons included
+# hla_entropy <- readRDS("/labs/khatrilab/solomonb/hla_project/hla_benchmark/hla_sequence_entropy.RDS")
+## Version where sequences without all exons present included
+hla_entropy <- readRDS(here("1_mapping_coverage/hla_sequence_entropy_includeIncomplete.RDS"))
+```
+
+
+### Plot individual loci
+```{r, message = F}
+gg_align <- function(locus, shannon, exons, length){
+  hla_window <-  length*0.1
+  plot <- shannon %>% 
+    mutate(shannon_roll = zoo::rollmean(shannon, k = round(hla_window), fill = NA)) %>% 
+    ggplot(aes(x = position))+
+    geom_bar(aes(y=shannon),stat = "identity") +
+    geom_path(aes(y=shannon_roll),stat = "identity") +
+    theme_bw() +
+    ggtitle(locus, subtitle = sprintf("Window: %s", round(hla_window)))+
+    coord_cartesian(ylim=c(0,2)) +
+    geom_rect(data = exons, aes(xmin = start, xmax = end, ymax = 1.9, ymin = 1.8, x = NULL, y = NULL), color = "black", fill = "white") +
+    geom_text(data = exons, aes(x = center, y = 2, label = exon))
+  suppressWarnings(print(plot))
+}
+
+# gg_align(hla_entropy$loci[[1]], hla_entropy$entropy[[1]], hla_entropy$ranges[[1]], hla_entropy$bp[[1]])
+
+hla_entropy %>% 
+  mutate(plot = pmap(list(loci, entropy, ranges, bp), gg_align))
+```
+### Plot heatmap of mean entropy
+```{r, fig.width=12, fig.height = 4, message = F}
+step <- 50
+hla_entropy %>% 
+  select(loci, entropy) %>% 
+  unnest(entropy) %>% 
+  mutate(bp = floor(position/step)*step) %>% 
+  group_by(loci, bp) %>% 
+  summarise(average_shannon = mean(shannon)) %>% 
+  ggplot(aes(x = bp, y = loci, fill = average_shannon))+
+  geom_tile() +
+  theme_bw() +
+  scale_fill_viridis_c()
+```
+### Plot rolling mean entropy
+```{r}
+gg_combo_entropy <- function(df, grouping_var){
+  grouping_var <- enquo(grouping_var)
+  df <- df %>% 
+    mutate(grouping = !!grouping_var) %>% 
+    group_by(grouping) %>% 
+    nest() %>% 
+    mutate(layer = map(data, function(x) list(
+      geom_path(data = x, stat = "identity", size = 2, aes(group = loci), color = "black"),
+      geom_path(data = x, stat = "identity", size = 1.5)
+  )))
+  ggplot(df, aes(x = position, y = shannon_roll, color = loci)) + 
+    df$layer +
+    theme_bw()+
+    scale_color_brewer(palette = "Set2") +
+    labs(y = "Shannon entropy", color = "Loci") 
+}
+```
+
+
+```{r, fig.width=12, fig.height = 4}
+step <- 100
+p5_plot <- hla_entropy %>% 
+  select(loci, entropy) %>% 
+  unnest(entropy) %>% 
+  group_by(loci) %>% 
+  # mutate(shannon_roll = zoo::rollmean(shannon, k = step, fill = NA)) %>% 
+  mutate(shannon_roll = zoo::rollapply(shannon, width = step, mean, partial = T)) %>% 
+  arrange(position) %>% 
+  gg_combo_entropy(., loci) +
+  labs(x = "Position from 5' (bp)") 
+
+p3_plot <- hla_entropy %>% 
+  select(loci, entropy) %>% 
+  unnest(entropy) %>% 
+  group_by(loci) %>% 
+  # mutate(shannon_roll = zoo::rollmean(shannon, k = step, fill = NA)) %>% 
+  mutate(shannon_roll = zoo::rollapply(shannon, width = step, mean, partial = T)) %>% 
+  mutate(position = max(position) - position) %>% 
+  # mutate(position = position - max(position)) %>% 
+  arrange(position) %>% 
+  gg_combo_entropy(., loci) +
+  # scale_x_reverse()+
+  labs(x = "Position from 3' (bp)") 
+```
+
+```{r, fig.width=12, fig.height = 8}
+plot_grid(
+  p5_plot,
+  p3_plot,
+  ncol = 1,
+  labels = c("A","B")
+)
+```
+
