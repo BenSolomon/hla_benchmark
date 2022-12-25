@@ -374,7 +374,7 @@ filter_drb_in_all_hla <- function(drb_predictions, all_hla_df, samples){
 # Takes a list of samples create all combinations along
 # Valid combinations determined from isb data since many samples
 make_drb_scaffold <- function(samples){
-  isb_hla <- readRDS("all_hla_expanded.RDS")
+  isb_hla <- readRDS( here("1_mapping_coverage/all_hla_expanded.RDS"))
   valid_combinations <- isb_hla %>% 
     filter(grepl("^DRB[345]", locus)) %>% 
     select(locus, contains("field"), genotyper) %>% 
