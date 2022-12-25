@@ -1,0 +1,177 @@
+---
+title: "1) Genotyping Accuracy"
+output: 
+  html_notebook:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    code_folding: hide
+---
+
+# Setup 
+```{r, message=F}
+library(tidyverse)
+library(cowplot)
+library(here)
+source(here("helper_functions/data_import_functions.R"))
+source(here("helper_functions/figure_format_functions.R"))
+source(here("helper_functions/calculation_functions.R"))
+isb_path <- here("data/isb")
+isb_samples <- read_tsv(here("data/isb/logs/parallel.log")) %>% 
+  separate(Command, into = c(NA, "sample"), sep = " ") %>% 
+  pull(sample) %>% unique()
+```
+
+```{r}
+all_hla <- format_hla_table(combine_HLA_import(path = isb_path, samples = isb_samples, expand_invitro = T))
+```
+
+
+# Calculations
+
+### Prediction tally
+
+```{r}
+prediction_tally <- all_hla %>% 
+  allele_tally() %>% 
+  filter(genotyper != "invitro") %>% 
+  filter(
+    grepl("-BL$", sample),  # Limit to the BL time point, others addressed in another figure 
+    !grepl("^DRB[345]", locus))  # DRB345 addressed in another figure
+```
+
+
+### Success
+```{r}
+success_df <- compare_hla(
+  hla_df = all_hla, 
+  reference = "invitro", 
+  method = "success", 
+  penalize_extra_drb345 = F
+) %>% 
+  filter(
+    grepl("-BL$", sample),
+    !grepl("^DRB[345]", locus))
+```
+
+### Accuracy
+
+```{r,message = F, warning=F}
+accuracy_df <- compare_hla(
+  hla_df = all_hla, 
+  reference = "invitro", 
+  method = "accuracy",
+  penalize_extra_drb345 = T
+) %>% 
+  filter(
+    grepl("-BL$", sample),
+    !grepl("^DRB[345]", locus))
+```
+
+# Plotting
+
+### Predicition tally
+
+```{r, fig.width = 5, fig.height = 8}
+predictions_plt <- gg_hla_prediction_tally(prediction_tally)
+predictions_plt
+```
+### Success
+
+```{r, fig.width = 5, fig.height = 4}
+success_plt <- calculate_summary_df(success_df) %>% 
+  gg_summary_hla_accuracy(color_label = "Success")
+success_plt
+```
+
+
+### Accuracy
+
+```{r, fig.width = 5, fig.height = 4}
+accuracy_plt <-  calculate_summary_df(accuracy_df) %>% 
+  exclude_genotyper_fields() %>% 
+  gg_summary_hla_accuracy(color_label = "Accuracy")
+accuracy_plt
+```
+
+# Full figure
+
+### Version 1
+```{r,fig.height = 6, fig.width = 9}
+plt_heatmaps <- plot_grid(
+  success_plt,
+  accuracy_plt,
+  ncol = 1,
+  labels = c("B","C")
+)
+plt_fig_main <- plot_grid(
+  predictions_plt,
+  plt_heatmaps,
+  labels = c("A",NA)
+)
+plt_fig_main
+```
+```{r}
+# save_plot("figures/v2/2_accuracy.pdf", plt_fig_main, ncol = 2,nrow = 2, base_asp = 1.4)
+# save_plot("figures/v2/2_accuracy.pdf", plt_fig_main, base_height = 8, base_width = 4)
+```
+
+
+# Accuracy table
+
+```{r, fig.width = 12}
+p5_accuracy_flextable <- calculate_summary_df(accuracy_df) %>% 
+  flex_summary_hla_accuracy() %>% 
+  fontsize(size = 8, part = "all") 
+
+# saveRDS(p5_accuracy_flextable, "tables/p5_accuracy_flextable.RDS")
+print(p5_accuracy_flextable)
+```
+
+# Success table
+```{r}
+p5_success_flextable <- calculate_summary_df(success_df) %>% 
+  flex_summary_hla_accuracy() %>% 
+  fontsize(size = 8, part = "all") 
+
+# saveRDS(p5_success_flextable, "tables/p5_success_flextable.RDS")
+print(p5_success_flextable)
+```
+
+# Supplemental figure
+
+### Accuracy by allele
+
+```{r, fig.width = 16, fig.height = 8}
+plt_allele_accuracy <- accuracy_df %>% 
+gg_allele_hla_accuracy()
+plt_allele_accuracy
+```
+
+### Accuracy by individual
+
+```{r, fig.width = 12, fig.height = 5}
+plt_individual_accuracy <- accuracy_df %>% 
+  gg_individual_hla_accuracy(color = "viridis")
+plt_individual_accuracy
+```
+### Combined supplemental
+
+```{r,fig.height = 8, fig.width = 12}
+plt_supplemental <- plot_grid(
+  plt_allele_accuracy,
+  plt_individual_accuracy,
+  ncol = 1,
+  labels = c("A","B"),
+  align = "v",
+  axis = "lr",
+  rel_heights = c(1, 0.75)
+)
+plt_supplemental
+```
+
+```{r}
+save_plot("figures/v2/s2_extra_accuracy.pdf", plt_supplemental, ncol = 1,nrow = 2, base_asp = 2, base_height = 6)
+```
+
+

@@ -7,7 +7,7 @@ require(tidyverse)
 #   pull(sample) %>% unique()
 
 ### Import ISB molecular genotyping
-invitro_import <- function(path = "hla_2020-10-23_1457.tsv", exclude_comment_samples=F){
+invitro_import <- function(path = here("data/isb/hla_2020-10-23_1457.tsv"), exclude_comment_samples=F){
   df <- read_tsv(path)
   # Remove samples with comments (e.g. Sample contamination)
   if (exclude_comment_samples == T){
@@ -148,14 +148,14 @@ scHLA_genotype_import <- function(path, sample){
 combine_HLA_import <- function(
     path, 
     samples, 
-    invitro_path="hla_2020-10-23_1457.tsv", 
+    invitro_path=here("data/isb/hla_2020-10-23_1457.tsv"), 
     filter_invitro = F, 
     expand_invitro = T,
     arcas_subdir = "arcasHLA",
     phlat_subdir = "phlat",
     opti_subdir = "optitype",
     miner_subdir = "hla_miner",
-    schla_subdir = "scHLAcount/results/211024_180304"
+    schla_subdir = "scHLAcount"
   ){
   suppressMessages({
     if (is.null(invitro_path)){
