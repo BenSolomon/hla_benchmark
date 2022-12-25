@@ -1,0 +1,373 @@
+---
+title: "R Notebook"
+output: 
+  html_notebook:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    code_folding: hide
+---
+
+# Setup
+```{r, message=F}
+library(tidyverse)
+library(cowplot)
+library(here)
+source(here("helper_functions/data_import_functions.R"))
+source(here("helper_functions/figure_format_functions.R"))
+source(here("helper_functions/calculation_functions.R"))
+isb_path <- here("data/isb")
+isb_samples <- read_tsv(here("data/isb/logs/parallel.log")) %>% 
+  separate(Command, into = c(NA, "sample"), sep = " ") %>% 
+  pull(sample) %>% unique()
+```
+
+# Data processing
+
+### Import and assembly
+```{r, fig.width=8, fig.height = 3}
+# Read data, calculate accuracy, split time points
+accuracy_df <- readRDS(here("3_DRB/all_hla_drb345_filtered.RDS")) %>% 
+  filter(
+    grepl("(AC|BL)$", sample), # Only AC, BL samples
+    grepl("^[ABCD]", locus), # Only HLA-A,B,C,D genes
+    !grepl("^(DM|DO|DRA)|[67]$",locus) # Further limit HLA-D genes
+    ) %>% 
+  calculate_all_hla_accuracy() %>%  # Calculate accuracy
+  separate(sample, into = c("sample", "time"), sep = "-") %>% # Separate time points
+  pivot_wider(names_from = "time", values_from = c("allele", "accuracy")) # Pivot
+
+# Calculate agreement
+agreement_df <- accuracy_df %>% 
+  mutate_at(vars(c("allele_AC", "allele_BL")), function(x) map(x, function(y) ifelse(is.null(y), NA, y))) %>%  # Convert nulls to NAs
+  filter(!(is.na(allele_AC) & is.na(allele_BL))) %>% # Filter out samples with NA genotypes for both time points (can't say whether this represents agreement or not)
+  mutate(observed_agreement = map2_dbl(allele_BL, allele_AC, allele_match, ground_truth = F)) %>%
+  mutate(expected_agreement = accuracy_AC*accuracy_BL) %>%
+  # Replace NAs for expected agreement to 0s 
+  # These always represent an NA accuracy * non-NA accuracy which should have agreement 0
+  mutate(expected_agreement = coalesce(expected_agreement, 0)) %>% 
+  exclude_genotyper_fields() 
+
+# saveRDS(agreement_df, here("4_agreement/agreement_df.RDS"))
+# agreement_df <-  readRDS(here("4_agreement/agreement_df.RDS"))
+```
+
+### Time point accuracy
+```{r}
+plt_t1 <- agreement_df %>% calculate_summary_df(var = "accuracy_AC") %>% gg_summary_hla_accuracy(color_label = "T1 accuracy")
+plt_t2 <- agreement_df %>% calculate_summary_df(var = "accuracy_BL") %>% gg_summary_hla_accuracy(color_label = "T2 accuracy")
+plt_t1; plt_t2
+```
+
+```{r}
+plt_t1_t2_diff <- agreement_df %>% 
+  accuracy_difference(var_1 = "accuracy_AC", var_2 = "accuracy_BL", sig_function = "wilcox.test") %>% 
+  gg_diff_heatmaps(color_label = "T1 - T2\naccuracy") 
+plt_t1_t2_diff
+```
+
+### Observed and expected agreement
+```{r}
+plt_ea <- agreement_df %>% calculate_summary_df(var = "expected_agreement") %>% gg_summary_hla_accuracy(color_label = "Expected\nagreement")
+plt_oa <- agreement_df %>% calculate_summary_df(var = "observed_agreement") %>% gg_summary_hla_accuracy(color_label = "Observed\nagreement")
+plt_ea; plt_oa
+```
+
+```{r}
+plt_ea_oa_diff <- agreement_df %>% 
+  accuracy_difference(var_1 = "observed_agreement", var_2 = "expected_agreement", sig_function = "wilcox.test") %>% 
+  gg_diff_heatmaps(color_label = "Observed -\nexpected\nagreement") 
+plt_ea_oa_diff
+```
+
+# Figures
+
+### Main figure
+
+```{r, fig.height=4, fig.width=10}
+plt_fig_main <- plot_grid(
+  plt_t1_t2_diff,
+  plt_ea_oa_diff,
+  nrow = 1,
+  labels = c("A","B")
+)
+plt_fig_main
+```
+
+```{r}
+save_plot(here("figures_pdf/v2/4_agreement.pdf"), plt_fig_main, base_height = 3, base_width = 9)
+```
+
+### Supplemental figure
+
+```{r, fig.width=10, fig.height=8}
+plt_fig_supp <- plot_grid(
+  plt_t1, 
+  plt_t2,
+  plt_ea,
+  plt_oa,
+  nrow = 2,
+  labels = LETTERS[1:4]
+)
+plt_fig_supp
+```
+
+```{r}
+save_plot(here("figures_pdf/v2/s4_agreement.pdf"), plt_fig_supp, base_height = 6, base_width = 9)
+```
+
+# Save all figure objects 
+```{r}
+listN <- function(...) {
+  anonList <- list(...)
+  names(anonList) <- as.character(substitute(list(...)))[-1]
+  anonList
+}
+
+saveRDS(
+  listN(plt_t1_t2_diff,
+        plt_ea_oa_diff,
+        plt_t1,
+        plt_t2,
+        plt_ea,
+        plt_oa),
+  here("figures_object/4_agreement_objects.RDS")
+)
+```
+
+# Tables
+
+```{r}
+agreement_df %>% calculate_summary_df(var = "accuracy_AC")
+agreement_df %>% calculate_summary_df(var = "accuracy_BL")
+```
+
+# Earlier analysis
+
+<!-- ```{r} -->
+<!-- all_hla <- readRDS("all_hla_drb345_filtered.RDS") -->
+<!-- ``` -->
+
+<!-- # Time-specific accuracy -->
+<!-- ```{r, message==F, warning=F} -->
+<!-- accuracy_df <- calculate_all_hla_accuracy(all_hla)  -->
+<!-- ``` -->
+
+<!-- ```{r, fig.width = 12, fig.height=4} -->
+<!-- BL_accuracy_plt <- calculate_summary_df(accuracy_df %>% filter(grepl("BL$", sample))) %>%  -->
+<!--   {.->>BL_accuracy;.} %>%  -->
+<!--   gg_summary_hla_accuracy(color_label = "Accuracy") -->
+<!-- AC_accuracy_plt <- calculate_summary_df(accuracy_df %>% filter(grepl("AC$", sample))) %>%  -->
+<!--   {.->>AC_accuracy;.} %>%  -->
+<!--   gg_summary_hla_accuracy(color_label = "Accuracy") -->
+<!-- comp_accuracy_plt <- BL_accuracy %>%  -->
+<!--   select(locus:mean_accuracy) %>%  -->
+<!--   left_join(AC_accuracy %>% select(locus:mean_accuracy), -->
+<!--             by = c("locus", "field","genotyper")) %>%  -->
+<!--   mutate(mean_accuracy = mean_accuracy.x - mean_accuracy.y) %>%  -->
+<!--   select(locus:genotyper, mean_accuracy) %>%  -->
+<!--   gg_summary_hla_accuracy(color_label = "Time 1 - \nTime 2") + -->
+<!--   scale_fill_gradientn(colors = RColorBrewer::brewer.pal(11, "BrBG"), na.value = "transparent", limits = c(-0.55,0.55), oob=squish) -->
+<!-- comp_accuracy_plt$layers[[1]]$aes_params$colour <- "black" -->
+
+<!-- time_split_plt <- plot_grid( -->
+<!--   BL_accuracy_plt,  -->
+<!--   AC_accuracy_plt, -->
+<!--   comp_accuracy_plt,  -->
+<!--   nrow = 1, -->
+<!--   labels = LETTERS[1:3] -->
+<!-- ) -->
+<!-- time_split_plt -->
+<!-- ``` -->
+<!-- ### Time accuracy table -->
+<!-- ```{r} -->
+<!-- bind_rows( -->
+<!--   BL_accuracy %>% mutate(time = "T1"), -->
+<!--   AC_accuracy %>% mutate(time = "T2") -->
+<!-- ) %>%  -->
+<!--   flex_summary_hla_accuracy(nesting_vars = c("field", "genotyper", "time")) %>%  -->
+<!--   fontsize(size = 8, part = "all") %>%  -->
+<!--   print(preview = "pptx") -->
+<!-- ``` -->
+
+
+<!-- # Sample agreement -->
+
+<!-- ```{r} -->
+<!-- collections <- c("AC","BL") -->
+<!-- collection_df <- all_hla %>%  -->
+<!--   separate(sample, into = c("sample", "collection"), sep = "-") %>%  -->
+<!--   filter(collection %in% collections) %>%  -->
+<!--   filter(genotyper != "invitro", grepl("^[ABCD]", locus)) %>%  -->
+<!--   mutate(field_2 = paste(field_1, field_2, sep = "_"), field_3 = paste(field_2, field_3, sep = "_")) %>% -->
+<!--   select(-allele_id) %>% -->
+<!--   group_by(sample, locus, genotyper, collection) %>% -->
+<!--   summarise_all(list) %>% -->
+<!--   pivot_longer(cols = !c(sample, locus, genotyper, collection), names_to = "field", values_to = "allele") %>% -->
+<!--   pivot_wider(names_from = "collection", names_prefix = "collection_", values_from = "allele", values_fill = list(NA)) %>%  -->
+<!--   filter(!grepl("^(DM|DO|DRA)|[67]$",locus)) -->
+
+<!-- ``` -->
+
+<!-- ```{r, fig.width = 12, fig.height=4} -->
+<!-- observed_agreement_df <- collection_df %>%  -->
+<!--   mutate(accuracy = map2_dbl(collection_BL, collection_AC, allele_match, ground_truth = F)) -->
+
+<!-- observed_agreement_plt <- observed_agreement_df %>% calculate_summary_df() %>% gg_summary_hla_accuracy(color_label = "Observed\nAgreement") -->
+
+<!-- predicted_agreement_df <- BL_accuracy %>%  -->
+<!--   select(locus:mean_accuracy) %>%  -->
+<!--   left_join(AC_accuracy %>% select(locus:mean_accuracy), -->
+<!--             by = c("locus", "field","genotyper")) %>%  -->
+<!--   rowwise() %>%  -->
+<!--   mutate(mean_accuracy = prod(across(contains("mean_accuracy")))) %>%  -->
+<!--   select(-contains("[xy]$"))%>%  -->
+<!--   select(-ends_with(c(".x",".y"))) %>%  -->
+<!--   ungroup() -->
+
+<!-- predicted_agreement_plt <- predicted_agreement_df %>% gg_summary_hla_accuracy(color_label = "Expected\nAgreement") -->
+
+<!-- oe_difference_df <- observed_agreement_df %>%  -->
+<!--   calculate_summary_df() %>%  -->
+<!--   left_join( -->
+<!--     predicted_agreement_df, -->
+<!--     by = c("locus", "field", "genotyper") -->
+<!--     ) %>% -->
+<!--   mutate(mean_accuracy = mean_accuracy.x - mean_accuracy.y) -->
+
+<!-- oe_difference_plt <- oe_difference_df %>%   -->
+<!--   drop_na() %>%  -->
+<!--   gg_summary_hla_accuracy(color_label = "Observed -\nExpected") +  -->
+<!--   scale_fill_gradientn(colors = RColorBrewer::brewer.pal(11, "BrBG"), na.value = "transparent", limits = c(-0.55,0.55), oob=squish) -->
+<!-- oe_difference_plt$layers[[1]]$aes_params$colour <- "black" -->
+
+<!-- agreement_plt <- plot_grid( -->
+<!--   observed_agreement_plt, -->
+<!--   predicted_agreement_plt,  -->
+<!--   oe_difference_plt,  -->
+<!--   nrow = 1,  -->
+<!--   labels = LETTERS[4:6] -->
+<!-- ) -->
+<!-- agreement_plt -->
+<!-- ``` -->
+
+<!-- ### Observed v. expected table -->
+<!-- ```{r} -->
+<!-- bind_rows( -->
+<!--   observed_agreement_df %>% calculate_summary_df() %>%  mutate(oe = "Obs"), -->
+<!--   predicted_agreement_df %>% mutate(oe = "Exp") -->
+<!-- ) %>%  -->
+<!--   flex_summary_hla_accuracy(nesting_vars = c("field", "genotyper", "oe")) %>% -->
+<!-- fontsize(size = 8, part = "all") %>% -->
+<!-- print(preview = "pptx") -->
+<!-- ``` -->
+
+<!-- # Combined plot -->
+
+<!-- ```{r, fig.width = 12, fig.height=6} -->
+<!-- plot_grid( -->
+<!--   time_split_plt, -->
+<!--   agreement_plt, -->
+<!--   ncol = 1 -->
+<!-- ) -->
+<!-- ``` -->
+
+
+
+
+
+
+
+
+
+
+
+
+# Old work
+
+<!-- ```{r gg_agreement} -->
+<!-- agreement_hla <- function(df, collections, complete_match=T){ -->
+<!--   df <- df %>%  -->
+<!--     separate(sample, into = c("sample", "collection"), sep = "-") %>%  -->
+<!--     filter(collection %in% collections) %>%  -->
+<!--     filter(genotyper != "invitro", grepl("^[ABCD]", locus)) %>%  -->
+<!--     mutate(field_2 = paste(field_1, field_2, sep = "_"), field_3 = paste(field_2, field_3, sep = "_")) %>% -->
+<!--     select(-allele_id) %>% -->
+<!--     group_by(sample, locus, genotyper, collection) %>% -->
+<!--     summarise_all(list) %>% -->
+<!--     pivot_longer(cols = !c(sample, locus, genotyper, collection), names_to = "field", values_to = "allele") %>% -->
+<!--      pivot_wider(names_from = "collection", names_prefix = "collection_", values_from = "allele", values_fill = list(NA)) %>%  -->
+<!--     # drop_na() %>%  -->
+<!--     rename("reference" = contains(collections[1])) %>% -->
+<!--     pivot_longer(contains("collection"),  names_to = "collection", values_to = "allele",names_prefix = "collection_")  -->
+<!--   if (complete_match == T){ -->
+<!--     df <- df %>%  -->
+<!--       # Filtering only samples/loci that have 2 alleles in both reference and comparison -->
+<!--       filter_at(vars(c(reference, allele)), function(x) !is.na(x)) %>% -->
+<!--       mutate(n_reference = map_dbl(reference, function(x) sum(!is.na(x) & !grepl("NA", x)))) %>% -->
+<!--       mutate(n_allele = map_dbl(allele, function(x) sum(!is.na(x) & !grepl("NA", x)))) %>% -->
+<!--       filter_at(vars(contains("n_")), function(x) x ==2) %>% -->
+<!--       mutate(accuracy = map2_dbl(reference, allele, allele_agreement)) %>% -->
+<!--     drop_na() -->
+<!--   } else { -->
+<!--     df <- df %>%  -->
+<!--       mutate(accuracy = map2_dbl(reference, allele, allele_agreement))  -->
+<!--     # %>%  -->
+<!--       # drop_na()       -->
+<!--   } -->
+<!--   df  -->
+<!-- } -->
+<!-- ``` -->
+
+<!-- ### *In silico* agreement with each other -->
+
+<!-- ```{r, fig.width = 18, fig.height=4} -->
+<!-- agreement_hla(all_hla, collections = c("AC", "BL"), complete_match = F) %>% gg_accuracy() -->
+<!-- # agreement_hla(all_hla_expanded, collections = c("AC", "BL"), complete_match = F) %>% gg_accuracy() -->
+<!-- ``` -->
+
+<!-- ```{r, fig.width = 18, fig.height=4} -->
+<!-- agreement_hla(all_hla_expanded, collections = c("AC", "BL"), complete_match = F) %>% gg_accuracy() -->
+<!-- # agreement_hla(all_hla_expanded, collections = c("AC", "BL"), complete_match = F) %>% gg_accuracy() -->
+<!-- ``` -->
+<!-- # Expected vs. actual accuracy -->
+<!-- ```{r, fig.width = 18, fig.height = 4} -->
+<!-- accuracy_df %>%  -->
+<!--   filter(!(time %in% c("CV", "PD1"))) %>%  -->
+<!--   pivot_wider(names_from = "time", values_from = "accuracy") %>%  -->
+<!--   mutate(accuracy = AC * BL) %>%  -->
+<!--   gg_accuracy -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- x <- agreement_hla(all_hla_expanded, collections = c("AC", "BL"), complete_match = F) %>%  -->
+<!--   select(sample, locus, genotyper, field, agreement_observed = accuracy) %>%  -->
+<!--   left_join( -->
+<!--     accuracy_df %>%  -->
+<!--       filter(!(time %in% c("CV", "PD1"))) %>%  -->
+<!--       pivot_wider(names_from = "time", values_from = "accuracy") %>%  -->
+<!--       mutate(agreement_expected = AC * BL) %>%  -->
+<!--       select(-AC, -BL), -->
+<!--     join_by = c("sample", "locus", "field", "genotyper") -->
+<!--   ) %>%  -->
+<!--   drop_na() %>% -->
+<!--   pivot_longer(cols = contains("agreement"), names_to = "metric", names_prefix = "agreement_", values_to = "agreement") -->
+<!-- ``` -->
+<!-- ###### FIGURE OUT WHAT IS GOING ON WITH NAs -->
+
+
+<!-- ```{r, fig.width = 18, fig.height = 4} -->
+<!-- x %>%  -->
+<!--   filter(field == "field_2") %>%  -->
+<!--   ggplot(aes(x = metric, y = agreement))+ -->
+<!--     stat_summary(fun = mean, geom = "point", position = position_dodge(width=0.9)) + -->
+<!--     stat_summary(fun.data = mean_se, geom = "errorbar", position=position_dodge(width=0.9)) + -->
+<!--     theme_bw() + -->
+<!--     facet_nested(.~locus+genotyper, scales = "free_y") + -->
+<!--     coord_cartesian(ylim = c(0,1))+ -->
+<!--     scale_y_continuous(n.breaks = 6)+ -->
+<!--     labs(y = "Accuracy", x = "")+ -->
+<!--     theme(axis.text.x = element_text(angle = 90))+ -->
+<!--     theme(panel.spacing = unit(0.1,"line")) -->
+<!-- ``` -->
+
