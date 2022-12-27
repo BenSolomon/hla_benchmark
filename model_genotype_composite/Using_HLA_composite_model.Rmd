@@ -1,0 +1,96 @@
+---
+title: "Using HLA composite model"
+output: 
+  html_notebook:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+---
+
+### Required packages
+```{r}
+library(checkmate)
+library(tidyverse)
+library(here)
+```
+
+### Data input format
+
+- Requires 5 columns: `sample`, `locus`, `field`, `genotyper`, and `allele`
+  - Additional columns are acceptable, but will be stripped
+  - `sample` has no specific requirements
+  - `locus` may only take the values "A", "B", "C", "DPA1", "DPB1", "DQA1", "DQB1", "DRB1", "DRB3", "DRB4", "DRB5"
+  - `field` may only take the values "field_1", "field_2", "field_3"
+  - `genotyper` may only take the values "arcasHLA", "hlaminer", "optitype", "phlat"
+  - `allele` has no specific requirements
+- Assertions within the subsequent functions will cause the function to fail with informative error messanging if these conditions are not fulfilled 
+  
+```{r}
+hla_df <- read_csv(here("model_genotype_composite/hla_input.csv"))
+hla_df
+```
+### Convert HLA data to input format needed for tree model
+
+```{r}
+make_tree_input <- function(df){
+  # Assert compatible columns and values in df
+  arg_col <- makeAssertCollection()
+  accept_column <- c("sample", "locus", "field", "genotyper", "allele")
+  accept_locus <- c("A", "B", "C", "DPA1", "DPB1", "DQA1", "DQB1", "DRB1", "DRB3", "DRB4", "DRB5")
+  accept_field <- c("field_1", "field_2", "field_3")
+  accept_genotyper <- c("arcasHLA", "hlaminer", "optitype", "phlat")
+  assertNames(names(df), must.include = accept_column, .var.name = "Data frame columns", add = arg_col)
+  if (arg_col$isEmpty()==F) {map(arg_col$getMessages(),print);reportAssertions(arg_col)}
+  assertNames(unique(df$locus), subset.of = accept_locus, .var.name = "Locus column", add = arg_col)
+  assertNames(unique(df$field), subset.of = accept_field, .var.name = "Field column", add = arg_col)
+  assertNames(unique(df$genotyper), subset.of = accept_genotyper, .var.name = "Genotyper column", add = arg_col)
+  if (arg_col$isEmpty()==F) {map(arg_col$getMessages(),print);reportAssertions(arg_col)}
+  
+  # Format df for tree model
+  df %>% 
+    select(sample, locus, field, genotyper, allele) %>%  
+    nest(allele = allele) %>% 
+    mutate(present = map_lgl(allele, function(x) !all(is.na(x)))) %>% # ID predictions that only generated NAs
+    select(sample, locus, field, genotyper, present) %>%  
+    pivot_wider(names_from = "genotyper", values_from = "present", names_prefix = "present_", values_fill = FALSE) %>% 
+    mutate_if(is.character, factor) %>% 
+    mutate_if(is.logical, factor) %>% 
+    mutate(sample = paste(sample, 1:n(), sep = "_")) %>% 
+    column_to_rownames("sample")
+}
+
+tree_df <- make_tree_input(hla_df)
+tree_df
+```
+
+### Obtain best-genotype predictions from tree model
+
+- Note that `tree_model` is read in from `6_composite/wPhlat_tree_model_list.RDS` within this function
+
+```{r}
+predict_genotyper <- function(df){
+  tree_model <- readRDS(here("6_composite/wPhlat_tree_model_list.RDS"))
+  df %>% 
+    select(locus:field) %>% 
+    bind_cols(predict(tree_model$model, new_data = tree_df)) %>%
+    rename("best_genotyper" = .pred_class) %>% 
+    rownames_to_column("sample") %>% 
+    mutate(sample = gsub("_[0-9]*$", "", sample))
+}
+
+output_df <- predict_genotyper(tree_df)
+output_df
+```
+
+### Filter HLA data based on best-genotype predictions
+
+```{r}
+filter_hla_genotypes <- function(df, predictions){
+  df %>%   
+    left_join(predictions, by = c("sample", "locus", "field")) %>% 
+    filter(genotyper == best_genotyper)
+}
+
+filter_hla_genotypes(hla_df, output_df)
+```
+

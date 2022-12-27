@@ -272,7 +272,7 @@ parse_log_time <- function(path){
 # parse_log_time(sample_path)
 
 # Gets bp length of set of alleles via IMGTHLA reference sequences
-get_allele_length <- function(alleles, IMGTHLA_path = "./references"){
+get_allele_length <- function(alleles, IMGTHLA_path = here("references")){
   path <- sprintf("%s/hla_gen.fasta", IMGTHLA_path)
   command_string <- sprintf("cat %s | awk '$1 ~ /^>/ {print}'", path)
   tibble(header = system(command_string, intern = T)) %>% 
