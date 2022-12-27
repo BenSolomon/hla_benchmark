@@ -24,7 +24,7 @@ isb_samples <- read_tsv(here("data/isb/logs/parallel.log")) %>%
 
 ```{r}
 all_hla <- format_hla_table(combine_HLA_import(path = isb_path, samples = isb_samples, expand_invitro = T))
-# saveRDS(all_hla, here("1_mapping_coverage/all_hla_expanded.RDS"))
+# saveRDS(all_hla, here("2_accuracy/all_hla_expanded.RDS"))
 ```
 
 
@@ -53,6 +53,8 @@ success_df <- compare_hla(
   filter(
     grepl("-BL$", sample),
     !grepl("^DRB[345]", locus))
+
+# saveRDS(success_df, here("2_accuracy/isb_success.RDS"))
 ```
 
 ### Accuracy

@@ -1,0 +1,311 @@
+---
+title: "6) Composite HLA genotypes"
+output: 
+  html_notebook:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    code_folding: hide
+---
+
+# Setup
+```{r, message = F}
+library(tidyverse)
+library(cowplot)
+library(scales)
+library(here)
+source(here("helper_functions/data_import_functions.R"))
+source(here("helper_functions/figure_format_functions.R"))
+source(here("helper_functions/calculation_functions.R"))
+isb_path <- here("data/isb")
+isb_samples <- read_tsv(here("data/isb/logs/parallel.log")) %>% 
+  separate(Command, into = c(NA, "sample"), sep = " ") %>% 
+  pull(sample) %>% unique()
+```
+
+
+# Runtime analysis
+
+```{r}
+time_df <- data.frame(sample = isb_samples) %>% 
+  mutate(log_path = sprintf("%s/logs/%s/%s_pipeline.log", isb_path,sample,sample)) %>% 
+  mutate(data = map(log_path, parse_log_time)) %>% 
+  unnest(data)
+
+# saveRDS(time_df, here("6_composite/time_df.RDS"))
+```
+
+```{r}
+time_df <- readRDS("data/time_df.RDS")
+time_df
+```
+
+
+```{r}
+gg_runtime(time_df)$data %>% 
+  group_by(component) %>% 
+  summarise(median_time = median(process_time)*60)
+```
+
+```{r}
+runtime_plt <- time_df %>% 
+  gg_runtime() +
+  scale_y_sqrt()
+runtime_plt
+```
+### Composite runtime
+
+```{r}
+time_df %>% 
+  select(sample, component, process_time) %>% 
+  pivot_wider(names_from = "component", values_from = "process_time") %>% 
+  mutate(PRE_PROCESS = `HISAT-AND-SORT` + `ARCAS-EXTRACT` + `INDEX`,
+         AO = PRE_PROCESS + `ARCAS-GENOTYPE` + OPTITYPE,
+         AOP = PRE_PROCESS + `ARCAS-GENOTYPE` + OPTITYPE + PHLAT,
+         ArcasHLA = PRE_PROCESS + `ARCAS-GENOTYPE`,
+         OptiType = PRE_PROCESS + `OPTITYPE`,
+         PHLAT = PRE_PROCESS + `PHLAT`) %>% 
+  select(sample, ArcasHLA, OptiType, PHLAT, AO, AOP) %>% 
+  pivot_longer(-sample, names_to = "component", values_to = "process_time") %>% 
+  group_by(component) %>% 
+  summarise(median_time = median(process_time)*60)
+
+```
+
+```{r, fig.width=6, fig.height=4}
+time_df %>% 
+  select(sample, component, process_time) %>% 
+  pivot_wider(names_from = "component", values_from = "process_time") %>% 
+  mutate(PRE_PROCESS = `HISAT-AND-SORT` + `ARCAS-EXTRACT` + `INDEX`,
+         AO = PRE_PROCESS + `ARCAS-GENOTYPE` + OPTITYPE,
+         AOP = PRE_PROCESS + `ARCAS-GENOTYPE` + OPTITYPE + PHLAT,
+         ArcasHLA = PRE_PROCESS + `ARCAS-GENOTYPE`,
+         OptiType = PRE_PROCESS + `OPTITYPE`,
+         PHLAT = PRE_PROCESS + `PHLAT`) %>% 
+  select(sample, ArcasHLA, OptiType, PHLAT, AO, AOP) %>% 
+  pivot_longer(-sample, names_to = "component", values_to = "process_time") %>% 
+  gg_runtime(include_tasks = c("ArcasHLA", "OptiType", "PHLAT", "AO", "AOP"))
+# +
+  # scale_y_sqrt()
+```
+
+
+# Composite genotyper
+
+### With PHLAT
+
+```{r}
+accuracy_df <- readRDS(here("3_DRB/isb_accuracy_drb345_filtered.RDS"))
+wPhlat_tree_model_list <- make_tree(accuracy_df, n_cores = 40)
+# saveRDS(wPhlat_tree_model_list, here("6_composite/wPhlat_tree_model_list.RDS"))
+# wPhlat_tree_model_list <-  readRDS(here("6_composite/wPhlat_tree_model_list.RDS"))
+```
+
+```{r, fig.width = 7, fig.height = 5}
+wPhlat_plt <- function(){suppressWarnings(rpart.plot::rpart.plot(wPhlat_tree_model_list$model$fit))}
+wPhlat_tree_model_list$auc
+wPhlat_plt()
+```
+
+### Without PHLAT
+
+```{r}
+woPhlat_tree_model_list <- make_tree(accuracy_df, n_cores = 40, genotypers = c("arcasHLA", "optitype"))
+# saveRDS(woPhlat_tree_model_list, here("6_composite/woPhlat_tree_model_list.RDS"))
+# woPhlat_tree_model_list <-  readRDS(here("6_composite/woPhlat_tree_model_list.RDS"))
+```
+
+```{r, fig.width = 7, fig.height = 5}
+woPhlat_plt <- function(){suppressWarnings(rpart.plot::rpart.plot(woPhlat_tree_model_list$model$fit, box.palette = "RdGy"))}
+woPhlat_tree_model_list$auc
+woPhlat_plt()
+```
+
+
+### Plot composite accuracy
+
+```{r}
+composite_accuracy_df <- bind_rows(
+  apply_tree(accuracy_df, wPhlat_tree_model_list, name = "Composite AOP"), 
+  apply_tree(accuracy_df, woPhlat_tree_model_list, name = "Composite AO"), 
+  accuracy_df) %>% 
+  filter(grepl("-BL$", sample))
+
+composite_loci_accuracy_plt <- composite_accuracy_df %>% 
+  calculate_summary_df() %>% 
+  gg_summary_hla_accuracy(color_label = "Accuracy")
+composite_loci_accuracy_plt
+```
+### Plot composite difference
+```{r}
+reference <- "Composite AOP"
+genotypers <- unique(composite_accuracy_df$genotyper)
+
+composite_loci_difference_plt <- composite_accuracy_df %>% 
+  calculate_summary_df() %>% 
+  select(-sd, - se) %>%
+  pivot_wider(names_from = "genotyper", values_from = "mean_accuracy") %>% 
+  pivot_longer(setdiff(genotypers, reference), names_to = "genotyper", values_to = "genotyper_accuracy") %>% 
+  mutate(mean_accuracy = !!sym(reference) - genotyper_accuracy) %>% 
+  drop_na() %>% 
+  gg_summary_hla_accuracy(color_label = "Composite AOP \naccuracy difference") +
+  scale_fill_gradientn(colors = RColorBrewer::brewer.pal(11, "BrBG"), limits = c(-0.55,0.55), oob=squish)
+composite_loci_difference_plt$layers[[1]]$aes_params$colour <- "black"
+composite_loci_difference_plt
+```
+
+```{r}
+genotypers <- c("arcasHLA", "Composite AO", "Composite AOP", "hlaminer", "optitype", "phlat")
+composite_loci_difference_plt <- composite_accuracy_df %>% 
+  dplyr::select(sample, locus, field, genotyper, accuracy) %>% 
+  pivot_wider(names_from = "genotyper", values_from = "accuracy") %>% 
+  mutate(reference = `Composite AOP`) %>% 
+  pivot_longer(genotypers, names_to = "genotyper", values_to = "accuracy") %>% 
+  accuracy_difference(var_1 = "reference", var_2 = "accuracy") %>% 
+  gg_diff_heatmaps(color_label = "Composite AOP\naccuracy gain")
+composite_loci_difference_plt
+```
+
+
+# Locus averaging
+
+```{r, fig.width = 7, fig.height = 2.5}
+averaged_composite_accuracy <- composite_accuracy_df %>% 
+  locus_average_accuracy() 
+
+composite_average_accuracy_plt <- averaged_composite_accuracy %>% 
+  calculate_summary_df() %>% 
+  gg_summary_hla_accuracy()
+composite_average_accuracy_plt
+
+reference <- "Composite AOP"
+genotypers <- unique(composite_accuracy_df$genotyper)
+
+composite_average_difference_plt <- averaged_composite_accuracy %>% 
+  calculate_summary_df() %>% 
+  select(-sd, - se) %>%
+  pivot_wider(names_from = "genotyper", values_from = "mean_accuracy") %>% 
+  pivot_longer(setdiff(genotypers, reference), names_to = "genotyper", values_to = "genotyper_accuracy") %>% 
+  mutate(mean_accuracy = !!sym(reference) - genotyper_accuracy) %>% 
+  drop_na() %>% 
+  gg_summary_hla_accuracy(color_label = "Composite AOP \naccuracy difference") +
+  scale_fill_gradientn(colors = RColorBrewer::brewer.pal(11, "BrBG"), limits = c(-0.55,0.55), oob=squish)
+composite_average_difference_plt$layers[[1]]$aes_params$colour <- "black"
+composite_average_difference_plt
+```
+```{r, fig.width = 7, fig.height = 2.5}
+genotypers <- c("arcasHLA", "Composite AO", "Composite AOP", "hlaminer", "optitype", "phlat")
+composite_average_difference_plt <- averaged_composite_accuracy %>% 
+  dplyr::select(sample, locus, field, genotyper, accuracy) %>% 
+  pivot_wider(names_from = "genotyper", values_from = "accuracy") %>% 
+  mutate(reference = `Composite AOP`) %>% 
+  pivot_longer(genotypers, names_to = "genotyper", values_to = "accuracy") %>% 
+  accuracy_difference(var_1 = "reference", var_2 = "accuracy") %>% 
+  gg_diff_heatmaps(color_label = "Composite AOP\naccuracy gain")
+composite_average_difference_plt
+```
+
+
+# Combined plots
+```{r, fig.width = 12, fig.height = 8}
+loci_plt <- plot_grid(
+  composite_loci_accuracy_plt,
+  composite_loci_difference_plt,
+  ncol = 1,
+  align = "v",
+  axis = "lr"
+)
+
+average_plt <- plot_grid(
+  composite_average_accuracy_plt,
+  composite_average_difference_plt,
+  ncol = 1,
+  align = "v",
+  axis = "lr"
+)
+
+plot_grid(
+  plot_grid(
+    runtime_plt,
+    average_plt,
+    ncol = 1,
+    align = "v",
+    axis = "lr"
+  ),
+  loci_plt,
+  nrow = 1,
+  align = "h",
+  axis = "tb"
+)
+```
+
+```{r, fig.width = 5.75, fig.height = 13}
+plot_grid(
+  runtime_plt,
+  composite_loci_accuracy_plt,
+  composite_loci_difference_plt,
+  composite_average_accuracy_plt,
+  composite_average_difference_plt,
+  ncol = 1,
+  align = "v",
+  axis = "lr",
+  rel_heights = c(1,1,1,0.6,0.6),
+  labels = LETTERS[1:5]
+)
+```
+
+```{r, fig.width = 6, fig.height = 10}
+plt_fig_main <- plot_grid(
+  runtime_plt,
+  composite_loci_difference_plt,
+  composite_average_difference_plt,
+  ncol = 1,
+  align = "v",
+  axis = "lr",
+  rel_heights = c(1,1,0.6),
+  labels = LETTERS[1:3]
+)
+plt_fig_main
+```
+```{r}
+save_plot("figures_pdf/v2/6_composite.pdf", plt_fig_main, base_height = 10, base_width = 6)
+```
+
+```{r}
+pdf("figures_pdf/v2/s5a_tree.pdf")
+wPhlat_plt()
+dev.off()
+pdf("figures_pdf/v2/s5b_tree.pdf")
+woPhlat_plt()
+dev.off()
+```
+```{r, fig.width = 6, fig.height = 7}
+plt_fig_supp <- plot_grid(
+  composite_loci_accuracy_plt,
+  composite_average_accuracy_plt,
+  ncol = 1,
+  rel_heights = c(1, 0.6),
+  labels = LETTERS[3:4]
+)
+plt_fig_supp
+```
+
+```{r}
+save_plot("figures_pdf/v2/s5cd_composite.pdf", plt_fig_supp, base_height = 7, base_width = 6)
+```
+
+
+
+# Tables
+
+```{r}
+composite_accuracy_flextable <- 
+  bind_rows(
+    averaged_composite_accuracy %>% calculate_summary_df(),
+      composite_accuracy_df %>% calculate_summary_df()
+  )  %>% 
+  flex_summary_hla_accuracy() %>%
+  fontsize(size = 8, part = "all") 
+# saveRDS(composite_accuracy_flextable, "tables/composite_accuracy_flextable.RDS")
+print(composite_accuracy_flextable)
+```

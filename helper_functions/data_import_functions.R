@@ -155,7 +155,7 @@ combine_HLA_import <- function(
     phlat_subdir = "phlat",
     opti_subdir = "optitype",
     miner_subdir = "hla_miner",
-    schla_subdir = "scHLAcount"
+    schla_subdir = "scHLAcount/output_genotype"
   ){
   suppressMessages({
     if (is.null(invitro_path)){
