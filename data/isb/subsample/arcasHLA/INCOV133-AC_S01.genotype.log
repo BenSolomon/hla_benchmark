@@ -1,0 +1,556 @@
+
+--------------------------------------------------------------------------------
+[log] Date: 2021-04-09
+[log] Sample: INCOV133-AC_S01
+[log] Input file(s): /labs/khatrilab/solomonb/covid/isb/subsample/raw_fastq/INCOV133-AC_S01.extracted.fq.gz
+[log] Reference: 7ca733b18edab1fc837a34e3764b7d55e8dc93b0
+--------------------------------------------------------------------------------
+[alignment] Analyzing read length
+[alignment] Pseudoaligning with Kallisto: 
+
+	kallisto pseudo -i /labs/khatrilab/solomonb/software_server/arcasHLA/scripts/../dat/ref/hla.idx -t 8 -o /tmp/arcas_5c4794f3-7dfa-45c1-8dc2-ba199142a4bb/ --single -l 87.789519 -s 8.028782 /labs/khatrilab/solomonb/covid/isb/subsample/raw_fastq/INCOV133-AC_S01.extracted.fq.gz
+
+	
+	[quant] fragment length distribution is truncated gaussian with mean = 87.7895, sd = 8.02878
+	[index] k-mer length: 31
+	[index] number of targets: 11,226
+	[index] number of k-mers: 264,111
+	[index] number of equivalence classes: 25,101
+	[quant] running in single-end mode
+	[quant] will process file 1: /labs/khatrilab/solomonb/covid/isb/subsample/raw_fastq/INCOV133-AC_S01.extracted.fq.gz
+	[quant] finding pseudoalignments for the reads ... done
+	[quant] processed 476,804 reads, 32,416 reads pseudoaligned
+	
+	
+[alignment] Processing pseudoalignment
+[alignment] Processed 476804 reads, 29793 pseudoaligned to HLA reference
+[alignment] 24742 reads mapped to a single HLA gene
+[alignment] Observed HLA genes:
+		gene          abundance    read count    classes
+		HLA-A            16.05%          4655        903
+		HLA-B            24.87%          7157        969
+		HLA-C             3.20%           932        438
+		HLA-DMA           1.83%           381          2
+		HLA-DMB           0.42%            87          3
+		HLA-DOA           0.03%             6          4
+		HLA-DOB           0.04%             8          4
+		HLA-DPA1          6.62%          1370         72
+		HLA-DPB1          5.56%          1141        152
+		HLA-DPB2          0.03%             6          2
+		HLA-DQA1          2.57%           521         71
+		HLA-DQB1          3.48%           745        122
+		HLA-DRA          12.23%          2472          8
+		HLA-DRB1         12.06%          2552         94
+		HLA-DRB3          3.58%           757         20
+		HLA-DRB4          0.01%             3          3
+		HLA-DRB5          0.04%             9          2
+		HLA-E             5.36%          1536        147
+		HLA-F             0.87%           240         11
+		HLA-H             0.01%             2          2
+		HLA-HFE           0.04%            10          1
+		HLA-K             0.02%             5          4
+		HLA-L             0.09%            27          1
+		HLA-T             0.98%           119          1
+		HLA-V             0.01%             1          1
+--------------------------------------------------------------------------------
+[genotype] Genotyping parameters:
+		population: prior
+		minimum count: 75
+		max iterations: 1000
+		tolerance: 1e-06
+		drop iterations: 4
+		drop threshold: 0.1
+		zygosity threshold: 0.15
+--------------------------------------------------------------------------------
+[genotype] Genotyping HLA-A
+[genotype] 4655 reads aligned to HLA-A in 903 classes
+[genotype] Top 10 alleles by undivided read count:
+		allele                  read count	
+		A*26:186                      2403	
+		A*26:01:01                    2340	
+		A*26:129                      2324	
+		A*26:01:50                    2323	
+		A*26:159                      2323	
+		A*26:01:62                    2322	
+		A*26:11N                      2322	
+		A*26:12                       2322	
+		A*26:14                       2322	
+		A*26:152                      2322	
+
+[genotype] Quantifying allele transcript abundance
+[genotype] EM converged after 36 iterations
+
+[genotype] Top alleles by abundance:
+		allele                  abundance
+		A*26:01:01                 43.28%
+		A*02:01:01                 16.13%
+		A*02:01:130                16.13%
+		A*02:01:159                16.13%
+		A*26:186                    8.31%
+
+[genotype] Pairs by % explained reads:
+		allele pair                     explained	
+		A*26:01:01, A*02:01:159             96.07%	
+		A*02:01:159, A*26:186               91.71%	
+		A*26:01:01, A*26:186                55.98%	
+
+[genotype] Checking zygosity
+[genotype] Likely heterozygous: minor/major nonshared count 0.97
+
+[genotype] Most likely genotype explaining 4472 reads:
+		A*26:01:01
+		A*02:01:01
+--------------------------------------------------------------------------------
+[genotype] Genotyping HLA-B
+[genotype] 7157 reads aligned to HLA-B in 969 classes
+[genotype] Top 10 alleles by undivided read count:
+		allele                  read count	
+		B*08:01:01                    6193	
+		B*08:234                      6168	
+		B*08:243                      6164	
+		B*08:01:50                    6163	
+		B*08:19N                      6160	
+		B*08:231                      6160	
+		B*08:260                      6160	
+		B*08:210                      6155	
+		B*08:01:56                    6154	
+		B*08:186                      6153	
+
+[genotype] Quantifying allele transcript abundance
+[genotype] EM converged after 29 iterations
+
+[genotype] Top alleles by abundance:
+		allele                  abundance
+		B*08:01:01                 71.64%
+		B*15:10:01                 16.15%
+		B*08:01:55                 12.21%
+
+[genotype] Pairs by % explained reads:
+		allele pair                     explained	
+		B*08:01:01, B*15:10:01              95.56%	
+
+[genotype] Checking zygosity
+[genotype] Likely heterozygous: minor/major nonshared count 0.19
+
+[genotype] Most likely genotype explaining 6839 reads:
+		B*08:01:01
+		B*15:10:01
+--------------------------------------------------------------------------------
+[genotype] Genotyping HLA-C
+[genotype] 932 reads aligned to HLA-C in 438 classes
+[genotype] Top 10 alleles by undivided read count:
+		allele                  read count	
+		C*03:04:06                     664	
+		C*03:04:02                     662	
+		C*03:04:78                     653	
+		C*03:04:52                     650	
+		C*03:04:54                     650	
+		C*03:393                       650	
+		C*03:405                       650	
+		C*03:443                       650	
+		C*03:448Q                      650	
+		C*03:453                       650	
+
+[genotype] Quantifying allele transcript abundance
+[genotype] EM converged after 13 iterations
+
+[genotype] Top alleles by abundance:
+		allele                  abundance
+		C*03:04:06                 49.18%
+		C*03:04:78                 40.86%
+		C*05:01:17                  9.96%
+
+[genotype] Pairs by % explained reads:
+		allele pair                     explained	
+		C*03:04:06, C*05:01:17              84.33%	
+
+[genotype] Checking zygosity
+[genotype] Likely homozygous: minor/major nonshared count 0.11
+
+[genotype] Most likely genotype explaining 786 reads:
+		C*03:04:06
+--------------------------------------------------------------------------------
+[genotype] Genotyping HLA-DMA
+[genotype] 381 reads aligned to HLA-DMA in 2 classes
+[genotype] Top 10 alleles by undivided read count:
+		allele                  read count	
+		DMA*01:01:01                   381	
+		DMA*01:02                      374	
+
+[genotype] Quantifying allele transcript abundance
+[genotype] EM converged after 3 iterations
+
+[genotype] Top alleles by abundance:
+		allele                  abundance
+		DMA*01:01:01              100.00%
+
+[genotype] Most likely genotype explaining 381 reads:
+		DMA*01:01:01
+--------------------------------------------------------------------------------
+[genotype] Genotyping HLA-DMB
+[genotype] 87 reads aligned to HLA-DMB in 3 classes
+[genotype] Top 10 alleles by undivided read count:
+		allele                  read count	
+		DMB*01:03:01                    87	
+		DMB*01:01:01                    80	
+		DMB*01:07                       37	
+
+[genotype] Quantifying allele transcript abundance
+[genotype] EM converged after 5 iterations
+
+[genotype] Top alleles by abundance:
+		allele                  abundance
+		DMB*01:03:01              100.00%
+
+[genotype] Most likely genotype explaining 87 reads:
+		DMB*01:03:01
+--------------------------------------------------------------------------------
+[genotype] Genotyping HLA-DOA
+[genotype] Not enough reads aligned to HLA-DOA to genotype.
+--------------------------------------------------------------------------------
+[genotype] Genotyping HLA-DOB
+[genotype] Not enough reads aligned to HLA-DOB to genotype.
+--------------------------------------------------------------------------------
+[genotype] Genotyping HLA-DPA1
+[genotype] 1370 reads aligned to HLA-DPA1 in 72 classes
+[genotype] Top 10 alleles by undivided read count:
+		allele                  read count	
+		DPA1*01:33                     885	
+		DPA1*01:03:01                  877	
+		DPA1*01:03:10                  877	
+		DPA1*01:19                     875	
+		DPA1*01:03:05                  872	
+		DPA1*01:03:16                  871	
+		DPA1*01:29N                    871	
+		DPA1*01:30                     870	
+		DPA1*01:03:19                  869	
+		DPA1*01:14                     869	
+
+[genotype] Quantifying allele transcript abundance
+[genotype] EM converged after 36 iterations
+
+[genotype] Top alleles by abundance:
+		allele                  abundance
+		DPA1*02:01:01              48.78%
+		DPA1*01:03:01              42.86%
+		DPA1*01:33                  8.36%
+
+[genotype] Pairs by % explained reads:
+		allele pair                     explained	
+		DPA1*02:01:01, DPA1*01:03:01        99.93%	
+		DPA1*02:01:01, DPA1*01:33           98.18%	
+		DPA1*01:03:01, DPA1*01:33           66.35%	
+
+[genotype] Checking zygosity
+[genotype] Likely heterozygous: minor/major nonshared count 0.97
+
+[genotype] Most likely genotype explaining 1369 reads:
+		DPA1*02:01:01
+		DPA1*01:03:01
+--------------------------------------------------------------------------------
+[genotype] Genotyping HLA-DPB1
+[genotype] 1141 reads aligned to HLA-DPB1 in 152 classes
+[genotype] Top 10 alleles by undivided read count:
+		allele                  read count	
+		DPB1*131:01:01                 664	
+		DPB1*17:01:01                  651	
+		DPB1*956:01                    645	
+		DPB1*460:01                    644	
+		DPB1*09:01:01                  636	
+		DPB1*91:01:01                  616	
+		DPB1*35:01:01                  615	
+		DPB1*14:01:01                  611	
+		DPB1*671:01                    606	
+		DPB1*651:01                    605	
+
+[genotype] Quantifying allele transcript abundance
+[genotype] EM converged after 8 iterations
+
+[genotype] Top alleles by abundance:
+		allele                  abundance
+		DPB1*131:01:01             60.66%
+		DPB1*17:01:01              39.34%
+
+[genotype] Pairs by % explained reads:
+		allele pair                     explained	
+		DPB1*131:01:01, DPB1*17:01:01        60.30%	
+
+[genotype] Checking zygosity
+[genotype] Likely heterozygous: minor/major nonshared count 0.65
+
+[genotype] Most likely genotype explaining 688 reads:
+		DPB1*131:01:01
+		DPB1*17:01:01
+--------------------------------------------------------------------------------
+[genotype] Genotyping HLA-DQA1
+[genotype] 521 reads aligned to HLA-DQA1 in 71 classes
+[genotype] Top 10 alleles by undivided read count:
+		allele                  read count	
+		DQA1*01:02:01                  357	
+		DQA1*01:11                     356	
+		DQA1*01:21                     355	
+		DQA1*01:02:03                  354	
+		DQA1*01:02:08                  354	
+		DQA1*01:19                     354	
+		DQA1*01:02:09                  353	
+		DQA1*01:38:01                  353	
+		DQA1*01:48                     353	
+		DQA1*01:02:02                  351	
+
+[genotype] Quantifying allele transcript abundance
+[genotype] EM converged after 11 iterations
+
+[genotype] Top alleles by abundance:
+		allele                  abundance
+		DQA1*01:02:01              69.00%
+		DQA1*05:05:01              31.00%
+
+[genotype] Pairs by % explained reads:
+		allele pair                     explained	
+		DQA1*05:05:01, DQA1*01:02:01        98.85%	
+
+[genotype] Checking zygosity
+[genotype] Likely heterozygous: minor/major nonshared count 0.45
+
+[genotype] Most likely genotype explaining 515 reads:
+		DQA1*05:05:01
+		DQA1*01:02:01
+--------------------------------------------------------------------------------
+[genotype] Genotyping HLA-DQB1
+[genotype] 745 reads aligned to HLA-DQB1 in 122 classes
+[genotype] Top 10 alleles by undivided read count:
+		allele                  read count	
+		DQB1*05:46                     467	
+		DQB1*05:02:01                  465	
+		DQB1*05:57                     463	
+		DQB1*05:250                    462	
+		DQB1*05:47                     462	
+		DQB1*05:14                     460	
+		DQB1*05:102                    459	
+		DQB1*05:02:23                  458	
+		DQB1*05:106                    458	
+		DQB1*05:02:11                  457	
+
+[genotype] Quantifying allele transcript abundance
+[genotype] EM converged after 62 iterations
+
+[genotype] Top alleles by abundance:
+		allele                  abundance
+		DQB1*05:46                 46.49%
+		DQB1*03:94                 17.31%
+		DQB1*03:19:01              13.38%
+		DQB1*05:47                  8.91%
+		DQB1*05:250                 8.88%
+		DQB1*03:01:46               5.03%
+
+[genotype] Pairs by % explained reads:
+		allele pair                     explained	
+		DQB1*05:46, DQB1*03:19:01           97.72%	
+		DQB1*05:46, DQB1*03:94              97.32%	
+		DQB1*05:250, DQB1*03:19:01          97.05%	
+		DQB1*05:46, DQB1*03:01:46           97.05%	
+		DQB1*05:47, DQB1*03:19:01           97.05%	
+		DQB1*05:250, DQB1*03:94             96.64%	
+		DQB1*05:47, DQB1*03:94              96.64%	
+		DQB1*05:250, DQB1*03:01:46          96.38%	
+		DQB1*05:47, DQB1*03:01:46           96.38%	
+		DQB1*05:250, DQB1*05:46             63.09%	
+		DQB1*05:46, DQB1*05:47              63.09%	
+		DQB1*05:250, DQB1*05:47             62.15%	
+		DQB1*03:01:46, DQB1*03:19:01        35.57%	
+		DQB1*03:19:01, DQB1*03:94           35.57%	
+		DQB1*03:01:46, DQB1*03:94           35.30%	
+
+[genotype] Checking zygosity
+[genotype] Likely heterozygous: minor/major nonshared count 0.56
+
+[genotype] Most likely genotype explaining 728 reads:
+		DQB1*05:46
+		DQB1*03:19:01
+--------------------------------------------------------------------------------
+[genotype] Genotyping HLA-DRA
+[genotype] 2472 reads aligned to HLA-DRA in 8 classes
+[genotype] Top 10 alleles by undivided read count:
+		allele                  read count	
+		DRA*01:01:01                  2435	
+		DRA*01:02:02                  2430	
+		DRA*01:02:03                  2386	
+		DRA*01:01:02                  2378	
+
+[genotype] Quantifying allele transcript abundance
+[genotype] EM converged after 5 iterations
+
+[genotype] Top alleles by abundance:
+		allele                  abundance
+		DRA*01:01:01               53.16%
+		DRA*01:02:02               46.84%
+
+[genotype] Pairs by % explained reads:
+		allele pair                     explained	
+		DRA*01:01:01, DRA*01:02:02         100.00%	
+
+[genotype] Checking zygosity
+[genotype] Likely heterozygous: minor/major nonshared count 0.88
+
+[genotype] Most likely genotype explaining 2472 reads:
+		DRA*01:01:01
+		DRA*01:02:02
+--------------------------------------------------------------------------------
+[genotype] Genotyping HLA-DRB1
+[genotype] 2552 reads aligned to HLA-DRB1 in 94 classes
+[genotype] Top 10 alleles by undivided read count:
+		allele                  read count	
+		DRB1*13:04                    2324	
+		DRB1*11:01:02                 2320	
+		DRB1*11:04:01                 2295	
+		DRB1*11:01:01                 2288	
+		DRB1*11:06:01                 2280	
+		DRB1*11:02:01                 2263	
+		DRB1*11:03:01                 2261	
+		DRB1*11:08:02                 2254	
+		DRB1*11:267                   2244	
+		DRB1*11:11:01                 2243	
+
+[genotype] Quantifying allele transcript abundance
+[genotype] EM converged after 10 iterations
+
+[genotype] Top alleles by abundance:
+		allele                  abundance
+		DRB1*13:04                 50.53%
+		DRB1*11:01:02              49.47%
+
+[genotype] Pairs by % explained reads:
+		allele pair                     explained	
+		DRB1*11:01:02, DRB1*13:04           98.35%	
+
+[genotype] Checking zygosity
+[genotype] Likely heterozygous: minor/major nonshared count 0.98
+
+[genotype] Most likely genotype explaining 2510 reads:
+		DRB1*11:01:02
+		DRB1*13:04
+--------------------------------------------------------------------------------
+[genotype] Genotyping HLA-DRB3
+[genotype] 757 reads aligned to HLA-DRB3 in 20 classes
+[genotype] Top 10 alleles by undivided read count:
+		allele                  read count	
+		DRB3*03:01:01                  679	
+		DRB3*03:01:03                  675	
+		DRB3*02:24                     464	
+		DRB3*02:02:01                  460	
+		DRB3*02:01                     453	
+		DRB3*02:02:14                  451	
+		DRB3*02:71                     450	
+		DRB3*02:02:20                  448	
+		DRB3*01:01:02                  164	
+		DRB3*01:01:13                  164	
+
+[genotype] Quantifying allele transcript abundance
+[genotype] EM converged after 13 iterations
+
+[genotype] Top alleles by abundance:
+		allele                  abundance
+		DRB3*03:01:01              79.36%
+		DRB3*02:02:01              20.64%
+
+[genotype] Pairs by % explained reads:
+		allele pair                     explained	
+		DRB3*03:01:01, DRB3*02:02:01        99.87%	
+
+[genotype] Checking zygosity
+[genotype] Likely heterozygous: minor/major nonshared count 0.26
+
+[genotype] Most likely genotype explaining 756 reads:
+		DRB3*03:01:01
+		DRB3*02:02:01
+--------------------------------------------------------------------------------
+[genotype] Genotyping HLA-DRB4
+[genotype] Not enough reads aligned to HLA-DRB4 to genotype.
+--------------------------------------------------------------------------------
+[genotype] Genotyping HLA-DRB5
+[genotype] Not enough reads aligned to HLA-DRB5 to genotype.
+--------------------------------------------------------------------------------
+[genotype] Genotyping HLA-E
+[genotype] 1536 reads aligned to HLA-E in 147 classes
+[genotype] Top 10 alleles by undivided read count:
+		allele                  read count	
+		E*01:03:01                    1431	
+		E*01:01:01                    1427	
+		E*01:10:01                    1421	
+		E*01:01:05                    1419	
+		E*01:01:31                    1417	
+		E*01:110                      1417	
+		E*01:30                       1417	
+		E*01:61                       1417	
+		E*01:78                       1417	
+		E*01:01:10                    1415	
+
+[genotype] Quantifying allele transcript abundance
+[genotype] EM converged after 27 iterations
+
+[genotype] Top alleles by abundance:
+		allele                  abundance
+		E*01:01:01                 45.24%
+		E*01:03:02                 40.51%
+		E*01:03:01                 14.25%
+
+[genotype] Pairs by % explained reads:
+		allele pair                     explained	
+		E*01:01:01, E*01:03:02              99.54%	
+
+[genotype] Checking zygosity
+[genotype] Likely heterozygous: minor/major nonshared count 0.19
+
+[genotype] Most likely genotype explaining 1529 reads:
+		E*01:01:01
+		E*01:03:01
+--------------------------------------------------------------------------------
+[genotype] Genotyping HLA-F
+[genotype] 240 reads aligned to HLA-F in 11 classes
+[genotype] Top 10 alleles by undivided read count:
+		allele                  read count	
+		F*01:01:02                     227	
+		F*01:01:01                     216	
+		F*01:01:05                     214	
+		F*01:05                        212	
+		F*01:02                        209	
+		F*01:01:04                     204	
+		F*01:03:01                     204	
+		F*01:06                        178	
+		F*01:04:01                     156	
+
+[genotype] Quantifying allele transcript abundance
+[genotype] EM converged after 10 iterations
+
+[genotype] Top alleles by abundance:
+		allele                  abundance
+		F*01:01:02                 64.86%
+		F*01:01:01                 35.14%
+
+[genotype] Pairs by % explained reads:
+		allele pair                     explained	
+		F*01:01:01, F*01:01:02             100.00%	
+
+[genotype] Checking zygosity
+[genotype] Likely heterozygous: minor/major nonshared count 0.54
+
+[genotype] Most likely genotype explaining 240 reads:
+		F*01:01:01
+		F*01:01:02
+--------------------------------------------------------------------------------
+[genotype] Genotyping HLA-G
+[genotype] Not enough reads aligned to HLA-G to genotype.
+--------------------------------------------------------------------------------
+[genotype] Genotyping HLA-H
+[genotype] Not enough reads aligned to HLA-H to genotype.
+--------------------------------------------------------------------------------
+[genotype] Genotyping HLA-J
+[genotype] Not enough reads aligned to HLA-J to genotype.
+--------------------------------------------------------------------------------
+[genotype] Genotyping HLA-K
+[genotype] Not enough reads aligned to HLA-K to genotype.
+--------------------------------------------------------------------------------
+[genotype] Genotyping HLA-L
+[genotype] Not enough reads aligned to HLA-L to genotype.
+--------------------------------------------------------------------------------
+

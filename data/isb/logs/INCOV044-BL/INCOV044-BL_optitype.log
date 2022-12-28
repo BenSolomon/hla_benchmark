@@ -1,0 +1,65 @@
+
+mapping with 16 threads...
+
+ 0:00:00.71 Mapping INCOV044-BL.extracted.fq.gz to NUC reference...
+
+ 0:01:59.55 Generating binary hit matrix.
+0:01:59.57 Loading /labs/khatrilab/solomonb/covid/isb/optitype/INCOV044-BL_1.bam started. Number of HLA reads loaded (updated every thousand):
+1K...2K...3K...4K...5K...6K...7K...8K...9K...10K...11K...12K...13K...
+ 0:02:05.48 13309 reads loaded. Creating dataframe...
+0:03:13.53 Dataframes created. Shape: 13309 x 7339, hits: 5199659 (5220019), sparsity: 1 in 18.71
+
+ 0:03:20.97 temporary pruning of identical rows and columns
+
+ 0:03:21.40 Size of mtx with unique rows and columns: (917, 1136)
+0:03:21.40 determining minimal set of non-overshadowed alleles
+
+ 0:03:27.66 Keeping only the minimal number of required alleles (306,)
+
+ 0:03:27.68 Creating compact model...
+
+starting ilp solver with 1 threads...
+
+ 0:03:30.50 Initializing OptiType model...
+GLPSOL: GLPK LP/MIP Solver, v4.57
+Parameter(s) specified in the command line:
+ --write /tmp/tmpaQ8wDh.glpk.raw --wglp /tmp/tmprbYgGT.glpk.glp --cpxlp /tmp/tmppugCK4.pyomo.lp
+Reading problem data from '/tmp/tmppugCK4.pyomo.lp'...
+/tmp/tmppugCK4.pyomo.lp:19319: warning: lower bound of variable 'x1727' redefined
+/tmp/tmppugCK4.pyomo.lp:19319: warning: upper bound of variable 'x1727' redefined
+1726 rows, 1166 columns, 12109 non-zeros
+735 integer variables, all of which are binary
+20054 lines were read
+Writing problem data to '/tmp/tmprbYgGT.glpk.glp'...
+18019 lines were written
+GLPK Integer Optimizer, v4.57
+1726 rows, 1166 columns, 12109 non-zeros
+735 integer variables, all of which are binary
+Preprocessing...
+372 hidden covering inequaliti(es) were detected
+1721 rows, 1164 columns, 12100 non-zeros
+734 integer variables, all of which are binary
+Scaling...
+ A: min|aij| =  1.000e+00  max|aij| =  4.000e+00  ratio =  4.000e+00
+Problem data seem to be well scaled
+Constructing initial basis...
+Size of triangular part is 1721
+Solving LP relaxation...
+GLPK Simplex Optimizer, v4.57
+1721 rows, 1164 columns, 12100 non-zeros
+      0: obj =  -0.000000000e+00 inf =   3.000e+00 (3)
+      3: obj =  -0.000000000e+00 inf =   0.000e+00 (0)
+*   500: obj =   1.097618200e+04 inf =   0.000e+00 (229) 1
+*   804: obj =   1.117295900e+04 inf =   6.661e-16 (0)
+OPTIMAL LP SOLUTION FOUND
+Integer optimization begins...
++   804: mip =     not found yet <=              +inf        (1; 0)
++   804: >>>>>   1.117295900e+04 <=   1.117295900e+04   0.0% (1; 0)
++   804: mip =   1.117295900e+04 <=     tree is empty   0.0% (0; 1)
+INTEGER OPTIMAL SOLUTION FOUND
+Time used:   0.1 secs
+Memory used: 3.3 Mb (3493202 bytes)
+Writing MIP solution to '/tmp/tmpaQ8wDh.glpk.raw'...
+2894 lines were written
+
+ 0:03:31.83 Result dataframe has been constructed...

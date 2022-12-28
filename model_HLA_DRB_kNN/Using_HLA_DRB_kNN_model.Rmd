@@ -1,0 +1,73 @@
+---
+title: "Using HLA-DRB kNN model"
+output: 
+  html_notebook:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+---
+
+### Required packages
+```{r}
+library(checkmate)
+library(tidyverse)
+library(here)
+library(kknn)
+```
+
+### Data input format
+
+- Requires 5 columns: `sample`, `DRB1`, `DRB3`, `DRB4`, and `DRB5`
+  - Each entry of `sample` must be unique
+  - `DRB1`, `DRB3`, `DRB4`, `DRB5` must be integers and represent the number of reads mapped to each locus
+
+```{r}
+# #drb_input.csv derived from analysis in 3_DRB/3_DRB.Rmd
+drb_input <- read_csv(here("model_HLA_DRB_kNN/drb_input.csv"))
+drb_input
+```
+### Function to calculate DRB345 : DRB1 mapping ratios
+
+```{r}
+make_drb345_ratios <- function(df){
+  # Assert compatible columns in df
+  arg_col <- makeAssertCollection()
+  df_columns <- c("sample", "DRB3", "DRB4", "DRB5")
+  assertNames(names(df), must.include = df_columns, .var.name = "df column names", add = arg_col)
+  if (arg_col$isEmpty()==F) {map(arg_col$getMessages(),print);reportAssertions(arg_col)}
+  
+  # Calculate ratios
+  df %>% 
+    mutate_at(vars(DRB3:DRB5), funs(./DRB1)) %>% 
+    select(-DRB1) 
+}
+
+drb345_ratios <- make_drb345_ratios(drb_input)
+drb345_ratios
+```
+### Function to apply kNN copy number predictions
+
+- Note that `drb_fit` model is read in from `3_DRB/drb345_knn_model.RDS` within this function
+```{r}
+predict_drb345_copy_number <- function(df) {
+  # Assert compatible columns in df
+  arg_col <- makeAssertCollection()
+  df_columns <- c("sample", "DRB3", "DRB4", "DRB5")
+  assertNames(names(df), must.include = df_columns, .var.name = "df column names", add = arg_col)
+  if (arg_col$isEmpty()==F) {map(arg_col$getMessages(),print);reportAssertions(arg_col)}
+  
+  # Read in kNN model
+  drb_fit <- readRDS(here("3_DRB/drb345_knn_model.RDS"))
+  
+  # Format df and apply kNN
+  df <- expand_grid(df, locus = c("DRB3", "DRB4", "DRB5"))
+  df %>% 
+    bind_cols(predict(drb_fit, new_data = df)) %>% 
+    dplyr::mutate("copy_number" = as.numeric(as.character(.pred_class))) %>% 
+    dplyr::select(sample, locus, copy_number) %>% 
+    pivot_wider(names_from = "locus", values_from = "copy_number")
+}
+
+predict_drb345_copy_number(drb345_ratios)
+```
+

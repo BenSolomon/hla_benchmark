@@ -1,0 +1,69 @@
+
+mapping with 16 threads...
+
+ 0:00:01.13 Mapping INCOV072-BL.extracted.fq.gz to NUC reference...
+
+ 0:04:05.70 Generating binary hit matrix.
+0:04:05.73 Loading /labs/khatrilab/solomonb/covid/isb/optitype/INCOV072-BL_1.bam started. Number of HLA reads loaded (updated every thousand):
+1K...2K...3K...4K...5K...6K...7K...8K...9K...10K...11K...12K...13K...14K...15K...16K...17K...18K...19K...20K...21K...22K...23K...24K...25K...26K...27K...28K...29K...30K...31K...32K...33K...34K...35K...36K...37K...38K...39K...40K...41K...42K...43K...44K...45K...46K...47K...48K...49K...50K...51K...52K...53K...54K...55K...56K...57K...58K...59K...60K...61K...62K...63K...64K...65K...66K...67K...68K...69K...70K...71K...72K...73K...74K...
+ 0:04:34.71 74812 reads loaded. Creating dataframe...
+0:12:55.56 Dataframes created. Shape: 74812 x 7339, hits: 25324717 (25328007), sparsity: 1 in 21.68
+
+ 0:13:28.12 temporary pruning of identical rows and columns
+
+ 0:13:29.89 Size of mtx with unique rows and columns: (1893, 1494)
+0:13:29.89 determining minimal set of non-overshadowed alleles
+
+ 0:13:47.78 Keeping only the minimal number of required alleles (585,)
+
+ 0:13:47.95 Creating compact model...
+
+starting ilp solver with 1 threads...
+
+ 0:14:33.08 Initializing OptiType model...
+GLPSOL: GLPK LP/MIP Solver, v4.57
+Parameter(s) specified in the command line:
+ --write /tmp/tmp6VVxqv.glpk.raw --wglp /tmp/tmpK_rAyX.glpk.glp --cpxlp /tmp/tmpl5aQ5T.pyomo.lp
+Reading problem data from '/tmp/tmpl5aQ5T.pyomo.lp'...
+/tmp/tmpl5aQ5T.pyomo.lp:73685: warning: lower bound of variable 'x5037' redefined
+/tmp/tmpl5aQ5T.pyomo.lp:73685: warning: upper bound of variable 'x5037' redefined
+5036 rows, 3099 columns, 52958 non-zeros
+1841 integer variables, all of which are binary
+75526 lines were read
+Writing problem data to '/tmp/tmpK_rAyX.glpk.glp'...
+69902 lines were written
+GLPK Integer Optimizer, v4.57
+5036 rows, 3099 columns, 52958 non-zeros
+1841 integer variables, all of which are binary
+Preprocessing...
+1 hidden packing inequaliti(es) were detected
+1115 hidden covering inequaliti(es) were detected
+5031 rows, 3097 columns, 52950 non-zeros
+1840 integer variables, all of which are binary
+Scaling...
+ A: min|aij| =  1.000e+00  max|aij| =  5.000e+00  ratio =  5.000e+00
+Problem data seem to be well scaled
+Constructing initial basis...
+Size of triangular part is 5031
+Solving LP relaxation...
+GLPK Simplex Optimizer, v4.57
+5031 rows, 3097 columns, 52950 non-zeros
+      0: obj =  -0.000000000e+00 inf =   4.000e+00 (4)
+      4: obj =  -0.000000000e+00 inf =   0.000e+00 (0)
+*   500: obj =   5.813027357e+04 inf =   6.344e-16 (1102) 1
+*  1000: obj =   6.368058600e+04 inf =   1.641e-14 (821)
+*  1500: obj =   6.392488300e+04 inf =   2.427e-14 (611)
+*  2000: obj =   6.423591100e+04 inf =   2.087e-14 (261) 1
+*  2261: obj =   6.438450900e+04 inf =   1.352e-14 (0)
+OPTIMAL LP SOLUTION FOUND
+Integer optimization begins...
++  2261: mip =     not found yet <=              +inf        (1; 0)
++  2268: >>>>>   6.438438300e+04 <=   6.438445500e+04 < 0.1% (4; 0)
++  2283: mip =   6.438438300e+04 <=     tree is empty   0.0% (0; 9)
+INTEGER OPTIMAL SOLUTION FOUND
+Time used:   0.5 secs
+Memory used: 12.2 Mb (12748491 bytes)
+Writing MIP solution to '/tmp/tmp6VVxqv.glpk.raw'...
+8137 lines were written
+
+ 0:14:40.66 Result dataframe has been constructed...

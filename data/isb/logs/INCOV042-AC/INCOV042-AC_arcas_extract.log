@@ -1,0 +1,36 @@
+
+--------------------------------------------------------------------------------
+[log] Date: 2021-02-21
+[log] Sample: INCOV042-AC
+[log] Input file: /labs/khatrilab/solomonb/covid/isb/bam/INCOV042-AC.bam
+[log] Read type: single-end
+--------------------------------------------------------------------------------
+[extract] Extracting reads from /labs/khatrilab/solomonb/covid/isb/bam/INCOV042-AC.bam
+[extract] Extracting chromosome 6: 
+
+	samtools view -H -@8 /labs/khatrilab/solomonb/covid/isb/bam/INCOV042-AC.bam -o /tmp/arcas_f32fd09a-9344-4c2c-9ef8-b8172f1fe243/INCOV042-AC.hla.sam
+
+[extract] Extracting chromosome 6: 
+
+	samtools view -@8 -F 4 /labs/khatrilab/solomonb/covid/isb/bam/INCOV042-AC.bam 6 >> /tmp/arcas_f32fd09a-9344-4c2c-9ef8-b8172f1fe243/INCOV042-AC.hla.sam
+
+[extract] Extracting unmapped reads: 
+
+	samtools view -@8 -f 4 /labs/khatrilab/solomonb/covid/isb/bam/INCOV042-AC.bam >> /tmp/arcas_f32fd09a-9344-4c2c-9ef8-b8172f1fe243/INCOV042-AC.hla.sam
+
+[extract] Converting SAM to BAM: 
+
+	samtools view -Sb -@8 /tmp/arcas_f32fd09a-9344-4c2c-9ef8-b8172f1fe243/INCOV042-AC.hla.sam > /tmp/arcas_f32fd09a-9344-4c2c-9ef8-b8172f1fe243/INCOV042-AC.hla.bam
+
+[extract] Sorting bam: 
+
+	samtools sort -n -@8 /tmp/arcas_f32fd09a-9344-4c2c-9ef8-b8172f1fe243/INCOV042-AC.hla.bam -o /tmp/arcas_f32fd09a-9344-4c2c-9ef8-b8172f1fe243/INCOV042-AC.hla.sorted.bam
+
+	[bam_sort_core] merging from 0 files and 8 in-memory blocks...
+	
+[extract] Converting bam to fastq: 
+
+	bedtools bamtofastq -i /tmp/arcas_f32fd09a-9344-4c2c-9ef8-b8172f1fe243/INCOV042-AC.hla.sorted.bam -fq /labs/khatrilab/solomonb/covid/isb/arcasHLA/INCOV042-AC.extracted.fq
+
+--------------------------------------------------------------------------------
+
