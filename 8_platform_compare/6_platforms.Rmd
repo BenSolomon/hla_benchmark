@@ -24,17 +24,16 @@ library(tidyverse)
 library(tidymodels)
 library(cowplot)
 library(kknn)
-source("data_import_functions.R")
-source("calculation_functions.R")
-source("figure_format_functions.R")
-# isb_path <- "/labs/khatrilab/solomonb/covid/isb"
-# isb_samples <- read_tsv("/labs/khatrilab/solomonb/covid/isb/logs/210217_232725/parallel.log") %>% 
-#   separate(Command, into = c(NA, "sample"), sep = " ") %>% 
-#   pull(sample) %>% unique()
+library(here)
+
+source(here("helper_functions/data_import_functions.R"))
+source(here("helper_functions/figure_format_functions.R"))
+source(here("helper_functions/calculation_functions.R"))
 ```
 
 ```{r, message = F}
-invitro_hla <- invitro_import(path = "pmid30518681_scisco_hla.tsv", exclude_comment_samples = T) %>% 
+invitro_hla <- invitro_import(path = here("data/pmid30518681/pmid30518681_scisco_hla.tsv"), 
+                              exclude_comment_samples = T) %>% 
   mutate(sample = gsub("STU-HD-","",sample))
 
 invitro_hla_c <- invitro_hla %>% filter(sample == "C")
@@ -47,7 +46,7 @@ invitro_hla <- bind_rows(
   invitro_hla_c %>% mutate(sample = "C2")
 )
 
-sample_metadata <- read_csv("/labs/khatrilab/solomonb/covid/pmid30518681/pmid30518681_samples.csv")
+sample_metadata <- read_csv(here("data/pmid30518681/pmid30518681_samples.csv"))
 pmid_3p_srr <- sample_metadata %>% filter(platform == "scRNA") %>% pull(Run)
 pmid_3p_samples <- sample_metadata %>% filter(platform == "scRNA") %>% pull(sample)
 pmid_bulk_srr <- sample_metadata %>% filter(platform == "bulkRNA") %>% pull(Run)
@@ -56,7 +55,7 @@ pmid_bulk_samples <- sample_metadata %>% filter(platform == "bulkRNA") %>% pull(
 ### 3'
 ```{r}
 pmid_3p_hla <- combine_HLA_import(
-  path = "/labs/khatrilab/solomonb/covid/pmid30518681/scRNA",
+  path = here("data/pmid30518681/scRNA"),
   samples = pmid_3p_srr,
   invitro_path = NULL) %>%  # Will manually add invitro
   rename(Run = sample) %>% 
@@ -72,7 +71,7 @@ pmid_3p_hla
 ### Bulk
 ```{r}
 pmid_bulk_hla <- combine_HLA_import(
-  path = "/labs/khatrilab/solomonb/covid/pmid30518681/bulkRNA",
+  path = here("data/pmid30518681/bulkRNA"),
   samples = pmid_bulk_srr,
   invitro_path = NULL) %>%  # Will manually add invitro
   rename(Run = sample) %>% 
@@ -91,8 +90,8 @@ pmid_bulk_hla
 
 ### Calculations
 ```{r}
-arcas_log_3p_dir <- "/labs/khatrilab/solomonb/covid/pmid30518681/scRNA/arcasHLA"
-arcas_log_bulk_dir <- "/labs/khatrilab/solomonb/covid/pmid30518681/bulkRNA/arcasHLA"
+arcas_log_3p_dir <- here("data/pmid30518681/scRNA/arcasHLA")
+arcas_log_bulk_dir <- here("data/pmid30518681/bulkRNA/arcasHLA")
 
 alignment_stats_3p_df <- hla_mapping_stats_import(pmid_3p_srr, arcas_log_3p_dir)
 alignment_stats_bulk_df <- hla_mapping_stats_import(pmid_bulk_srr, arcas_log_bulk_dir)
@@ -111,7 +110,7 @@ drb345_ratios_bulk <- get_drb345_ratios(alignment_stats_bulk_df) %>%
 ```
 
 ```{r, message = F}
-pmid_copy_number <- get_drb345_copy_number("pmid30518681_scisco_hla.tsv") %>% 
+pmid_copy_number <- get_drb345_copy_number(here("data/pmid30518681/pmid30518681_scisco_hla.tsv")) %>% 
   mutate(sample = gsub(".*HD-","",sample))
 
 # Duplicate in vitro typing for replicate samples Ck, C1, C2
@@ -133,7 +132,7 @@ drb345_df_bulk <- create_drb345_df(drb345_ratios_bulk, pmid_copy_number)
 
 ```{r}
 # Apply KNN model
-drb_model <- readRDS("drb345_knn_model.RDS")
+drb_model <- readRDS(here("3_DRB/drb345_knn_model.RDS"))
 drb345_3p_predicted <- apply_drb345_knn(drb345_df_3p, drb_model)
 drb345_bulk_predicted <- apply_drb345_knn(drb345_df_bulk, drb_model)
 ```
@@ -203,7 +202,7 @@ drb345_bulk_predicted %>%
 ### DRB345 ratio distribution plots
 
 ```{r, message = F, warning = F}
-drb345_df_5p <- read_csv("isb_drb345_df.csv")
+drb345_df_5p <- read_csv(here("3_DRB/isb_drb345_df.csv"))
 drb345_ratio_plt_3p <- gg_drb345_ratio(drb345_df_3p, drb345_df_5p)
 drb345_ratio_plt_bulk <- gg_drb345_ratio(drb345_df_bulk, drb345_df_5p)
 drb345_ratio_plt_3p
@@ -251,11 +250,11 @@ all_hla_drb345_bulk_filtered <- filter_drb_in_all_hla(drb_predictions = drb345_b
                                                       all_hla_df = pmid_bulk_hla, 
                                                       samples = pmid_bulk_samples)
 
-# saveRDS(all_hla_drb345_3p_filtered, "data/all_hla_drb345_filtered_pmid_scRNA.RDS")
-# saveRDS(all_hla_drb345_bulk_filtered, "data/all_hla_drb345_filtered_pmid_bulkRNA.RDS")
+# saveRDS(all_hla_drb345_3p_filtered, here("8_platform_compare/all_hla_drb345_filtered_pmid_scRNA.RDS"))
+# saveRDS(all_hla_drb345_bulk_filtered, here("8_platform_compare/all_hla_drb345_filtered_pmid_bulkRNA.RDS"))
 
-# all_hla_drb345_3p_filtered <- readRDS("data/all_hla_drb345_filtered_pmid_scRNA.RDS")
-# all_hla_drb345_bulk_filtered <- readRDS("data/all_hla_drb345_filtered_pmid_bulkRNA.RDS")
+# all_hla_drb345_3p_filtered <- readRDS(here("8_platform_compare/all_hla_drb345_filtered_pmid_scRNA.RDS"))
+# all_hla_drb345_bulk_filtered <- readRDS(here("8_platform_compare/all_hla_drb345_filtered_pmid_bulkRNA.RDS"))
 ```
 
 # Plots and tables
@@ -341,7 +340,7 @@ plt_fig_supp <- plot_grid(accuracy_3p_plt,
 plt_fig_supp
 ```
 ```{r}
-save_plot("figures_pdf/v2/s1_platforms.pdf", plt_fig_supp, base_height = 3, base_width = 8)
+save_plot(here("figures_pdf/v2/s1_platforms.pdf"), plt_fig_supp, base_height = 3, base_width = 8)
 ```
 
 ### Accuracy tables
@@ -350,7 +349,7 @@ save_plot("figures_pdf/v2/s1_platforms.pdf", plt_fig_supp, base_height = 3, base
 p3_accuracy_flextable <- calculate_summary_df(accuracy_3p_df) %>% 
   flex_summary_hla_accuracy() %>% 
   fontsize(size = 8, part = "all")
-saveRDS(p3_accuracy_flextable, "tables/p3_accuracy_flextable.RDS")
+# saveRDS(p3_accuracy_flextable, here("tables/p3_accuracy_flextable.RDS"))
 print(p3_accuracy_flextable)
 ```
 
@@ -358,7 +357,7 @@ print(p3_accuracy_flextable)
 bulk_accuracy_flextable <- calculate_summary_df(accuracy_bulk_df) %>% 
   flex_summary_hla_accuracy() %>% 
   fontsize(size = 8, part = "all") 
-saveRDS(bulk_accuracy_flextable, "tables/bulk_accuracy_flextable.RDS")
+# saveRDS(bulk_accuracy_flextable, here("tables/bulk_accuracy_flextable.RDS"))
 print(bulk_accuracy_flextable)
 ```
 
@@ -383,7 +382,7 @@ saveRDS(
     accuracy_bulk_plt,
     prediction_tally_bulk_plt
   ),
-  "figures_object/6_platforms.RDS"
+  here("figures_object/6_platforms.RDS")
 )
 
 ```
