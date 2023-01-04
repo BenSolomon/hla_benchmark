@@ -36,7 +36,7 @@ time_df <- data.frame(sample = isb_samples) %>%
 ```
 
 ```{r}
-time_df <- readRDS("data/time_df.RDS")
+time_df <- readRDS(here("6_composite/time_df.RDS"))
 time_df
 ```
 
@@ -69,11 +69,10 @@ time_df %>%
   pivot_longer(-sample, names_to = "component", values_to = "process_time") %>% 
   group_by(component) %>% 
   summarise(median_time = median(process_time)*60)
-
 ```
 
 ```{r, fig.width=6, fig.height=4}
-time_df %>% 
+comptime_plt <- time_df %>% 
   select(sample, component, process_time) %>% 
   pivot_wider(names_from = "component", values_from = "process_time") %>% 
   mutate(PRE_PROCESS = `HISAT-AND-SORT` + `ARCAS-EXTRACT` + `INDEX`,
@@ -85,8 +84,8 @@ time_df %>%
   select(sample, ArcasHLA, OptiType, PHLAT, AO, AOP) %>% 
   pivot_longer(-sample, names_to = "component", values_to = "process_time") %>% 
   gg_runtime(include_tasks = c("ArcasHLA", "OptiType", "PHLAT", "AO", "AOP"))
-# +
-  # scale_y_sqrt()
+
+comptime_plt
 ```
 
 
@@ -279,19 +278,22 @@ pdf("figures_pdf/v2/s5b_tree.pdf")
 woPhlat_plt()
 dev.off()
 ```
-```{r, fig.width = 6, fig.height = 7}
+```{r, fig.width = 6, fig.height = 9}
 plt_fig_supp <- plot_grid(
   composite_loci_accuracy_plt,
   composite_average_accuracy_plt,
+  comptime_plt,
   ncol = 1,
-  rel_heights = c(1, 0.6),
-  labels = LETTERS[3:4]
+  rel_heights = c(1, 0.6,0.7),
+  labels = LETTERS[3:5],
+  align = "v",
+  axis = "lr"
 )
 plt_fig_supp
 ```
 
 ```{r}
-save_plot("figures_pdf/v2/s5cd_composite.pdf", plt_fig_supp, base_height = 7, base_width = 6)
+save_plot(here("figures_pdf/v2/s5cde_composite.pdf"), plt_fig_supp, base_height = 9, base_width = 6)
 ```
 
 
