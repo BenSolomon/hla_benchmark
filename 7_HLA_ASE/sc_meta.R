@@ -1,13 +1,12 @@
 library(tidyverse)
 library(meta)
+library(here)
 
 source(here("helper_functions/data_import_functions.R"))
-isb_path <- here("data/isb")
+scHLAcount_dir <- here("data/isb/scHLAcount/")
 
-srt <- readRDS(here("data/isb/isb_sc_metadata.RDS"))
+srt <- readRDS("/labs/khatrilab/hongzheng/webapps/isb/srt_isb260.meta.rds")
 cells <- c("CD14 Monocyte", "CD4 T", "CD8 T", "NK", "B", "CD16 Monocyte", "cDC", "pDC")
-srt <- srt %>% select(sample, sampleID, cell, celltype, severity, UMAP_1, UMAP_2) %>% 
-  filter(celltype %in% cells)
 
 # Function to perform meta-analysis on dataframe where
 # each row is a cell and columns:
@@ -29,11 +28,12 @@ sc_meta <- function(df){
 # Import data based on sample and genotyper
 cell_stats <- expand_grid(
   genotyper = c("invitro", "arcasHLA", "optitype", "phlat", "hlaminer"),
-  sample = read_lines(here("data/isb/scHLAcount/BL_fastq_files.txt"))) %>% 
+  sample = read_lines(sprintf("%s/BL_fastq_files.txt", scHLAcount_dir))
+  ) %>%
   # head(5) %>% # Specify limit to number of meta-analyses
   mutate(data = map2(sample, genotyper, function(s,g){
-    result_path = sprintf("%s/scHLAcount/output_ase/%s",isb_path, g)
-    barcode_path = sprintf("%s/scHLAcount/barcodes", isb_path)
+    result_path = sprintf("%s/output/%s", scHLAcount_dir, g)
+    barcode_path = sprintf("%s/barcodes", scHLAcount_dir)
     scHLA_data_processing(sample = s,
                           result_dir = result_path,
                           barcode_dir = barcode_path)
@@ -42,6 +42,7 @@ cell_stats <- expand_grid(
   mutate(sample = gsub("_[A-Z][0-9]$","",sample)) %>% # Consolidate samples
   left_join(srt %>% select(celltype, cell), by = "cell") %>% # Add celltypes
   filter(celltype %in% cells) # Keep only standard cell types
+
 
 meta_df <- cell_stats %>% 
   # Keep only most expressed allele (or random if 50:50)
@@ -60,7 +61,7 @@ meta_df <- cell_stats %>%
   mutate(data = map(data,function(x) {sc_meta(x)})) %>%
   unnest(data)
 
-write_csv(meta_df, here("7_HLA_ASE/meta_analysis_results.csv"))
+write_csv(meta_df, here("7_HLA_ASE/meta_analysis_results_2.csv"))
 
 
 

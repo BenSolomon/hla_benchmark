@@ -14,6 +14,7 @@ library(tidyverse)
 library(meta)
 library(cowplot)
 library(here)
+library(ggrastr)
 
 source(here("helper_functions/data_import_functions.R"))
 source(here("helper_functions/figure_format_functions.R"))
@@ -31,7 +32,7 @@ isb_path <- here("data/isb")
 
 ```{r, eval=F}
 # Assemble key linking sample-pool to simplified sample
-hla_samples <- read_tsv("../../covid/isb/scHLAcount/all_fastq_files.txt", col_names = "file") %>% 
+hla_samples <- read_tsv(here("data/isb/scHLAcount/BL_fastq_files.txt"), col_names = "file") %>% 
   filter(grepl("^INCOV", file)) %>% 
   filter(grepl("-BL", file)) %>% 
   separate(file, into = c("sample", NA), sep = "_", remove = F) %>% 
@@ -44,7 +45,7 @@ select_last_allele <- function(x){
     str_replace_all("_", ":")}
 hla_key <- all_hla_expanded %>% 
   rowwise() %>% 
-  filter(grepl("^[ABC]", locus)) %>% 
+  filter(locus %in% c("A","B","C","DPA1","DPB1","DQA1","DQB1","DRB1")) %>% 
   mutate(allele = select_last_allele(across(contains("field")))) %>% 
   select(sample, genotyper, locus, allele) %>% 
   unite(allele, locus, allele, sep = "*")
@@ -58,12 +59,12 @@ hla_merge <- hla_samples %>%
   nest()
 
 # # Write keys to set of csvs for input to scHLAcount
-# hla_merge %>% 
+# hla_merge %>%
 #   mutate(write = pmap(list(data, file, genotyper), function(d,f,g){
-#     dir <- sprintf("../../covid/isb/scHLAcount/genotypes/%s",g)
+#     dir <- here(sprintf("data/isb/scHLAcount/genotypes/%s",g))
 #     if (!dir.exists(dir)){dir.create(dir, recursive = T)}
-#     write_tsv(d, 
-#               sprintf("%s/%s_hla.tsv",dir,f), 
+#     write_tsv(d,
+#               sprintf("%s/%s_hla.tsv",dir,f),
 #               col_names = F,
 #               )}))
 ```
@@ -78,20 +79,21 @@ hla_merge <- hla_samples %>%
 
 # SET GLOBAL VARIABLES
 # General
+export GIT_DIR=/labs/khatrilab/solomonb/hla_project/hla_benchmark/data/isb/scHLAcount
 export BASE_DIR=/labs/khatrilab/solomonb/covid/isb/scHLAcount
-export LOG_DIR=$BASE_DIR/logs/$(date +'%y%m%d_%H%M%S')
+export LOG_DIR=$GIT_DIR/logs/$(date +'%y%m%d_%H%M%S')
 # FASTQ/HISAT
 export INDEX_DIR=/labs/khatrilab/solomonb/rnaseq_processing/hisat2/hisat_arcas/hisat_data/grch38
 export BAM_DIR=$BASE_DIR/bam
 # HLA references
-export HLA_DIR=$BASE_DIR/hla_references
+export HLA_DIR=$GIT_DIR/hla_references
 export HLANUC=/labs/khatrilab/solomonb/references/IMGTHLA/hla_nuc.fasta
 export HLAGEN=/labs/khatrilab/solomonb/references/IMGTHLA/hla_gen.fasta
 # SCHLA
-export BARCODE_DIR=$BASE_DIR/barcodes
-export GENOTYPE_DIR=$BASE_DIR/genotypes
-export SCHLACOUNT_DIR=$BASE_DIR/output
-export TEMP_DIR=$BASE_DIR/temp_fastq
+export BARCODE_DIR=$GIT_DIR/barcodes
+export GENOTYPE_DIR=$GIT_DIR/genotypes
+export SCHLACOUNT_DIR=$GIT_DIR/output
+export TEMP_DIR=$GIT_DIR/temp_fastq
 # SLURM 
 export N_CORES=$SLURM_CPUS_PER_TASK
 
@@ -170,7 +172,7 @@ PIPELINE(){
 }
 export -f PIPELINE
 
-cat $BASE_DIR/BL_fastq_files.txt | parallel --delay 15 -j $SLURM_NTASKS --joblog $LOG_DIR/parallel.log PIPELINE {}
+cat $GIT_DIR/BL_fastq_files.txt | parallel --delay 15 -j $SLURM_NTASKS --joblog $LOG_DIR/parallel.log PIPELINE {}
 ```
 
 
@@ -246,7 +248,6 @@ plt_srt
 # samp <- "INCOV022-BL"
 # samp <- "INCOV083-BL"
 samp <- "INCOV028-BL"
-gene_select <- "A"
 scHLAcount_dir <- sprintf("%s/scHLAcount", isb_path)
 
 # Create tibble of all genotyper and sample combinations
@@ -255,7 +256,7 @@ allele_data <- expand_grid(
   sample = read_lines(here("data/isb/scHLAcount/BL_fastq_files.txt"))) %>% 
   filter(grepl(samp, sample)) %>% 
   # Import data based on sample and genotyper
-  mutate(result_path = sprintf("%s/scHLAcount/output_ase/%s",isb_path, genotyper),
+  mutate(result_path = sprintf("%s/scHLAcount/output/%s",isb_path, genotyper),
          barcode_path = sprintf("%s/scHLAcount/barcodes", isb_path)) %>% 
   mutate(data = pmap(list(sample, result_path, barcode_path), function(s,r,b){
     df <- scHLA_data_processing(
@@ -267,70 +268,152 @@ allele_data <- expand_grid(
 ```
 
 ```{r, fig.width = 12, fig.height = 6}
-allele_data_ratios <- allele_data %>% 
-  filter(gene == gene_select) %>% 
-  mutate(genotyper = reformat_hla_genotyper(genotyper)) %>% 
-  mutate(allele_order = fct_recode(factor(allele_order), "Allele 1" = "1", "Allele 2" = "2"))
+plot_allele_frequencies <- function(allele_data, gene_select){
+
+  allele_data_ratios <- allele_data %>% 
+    filter(gene == gene_select) %>% 
+    mutate(genotyper = reformat_hla_genotyper(genotyper)) %>% 
+    mutate(allele_order = fct_recode(factor(allele_order), "Allele 1" = "1", "Allele 2" = "2"))
+    
+  allele_label <- allele_data_ratios %>% 
+    select(genotyper, allele_order, allele) %>% 
+    distinct()
   
-allele_label <- allele_data_ratios %>% 
-  select(genotyper, allele_order, allele) %>% 
-  distinct()
+  plt <- srt %>% 
+    left_join(allele_data_ratios %>% filter(gene == gene_select), by = "cell") %>% 
+    filter(!is.na(allele)) %>% 
+    ggplot(aes(x = UMAP_1, y = UMAP_2, color = allele_ratio)) +
+    geom_point(size = 0.5, alpha = 0.5)+
+    theme_bw() +
+    facet_grid(allele_order~genotyper)+
+    scale_color_gradient2(high = "red", mid = "grey80", low = "blue", midpoint = 0.5, na.value = "transparent") +
+    labs(x="UMAP 1", y="UMAP 2", color = "Allele \nFrequency")+
+    theme(axis.ticks = element_blank(), axis.text = element_blank())+
+    coord_cartesian(ylim = c(-10,15))
+  
+  plt_allele_freq <- plt+
+    geom_label(data = allele_label, aes(x=-10,y=14, color = NULL, label = allele), size = 3, hjust = 0)
+  
+  return(plt_allele_freq)
+}
 
-plt <- srt %>% 
-  left_join(allele_data_ratios %>% filter(gene == gene_select), by = "cell") %>% 
-  filter(!is.na(allele)) %>% 
-  ggplot(aes(x = UMAP_1, y = UMAP_2, color = allele_ratio)) +
-  geom_point(size = 0.5, alpha = 0.5)+
-  theme_bw() +
-  facet_grid(allele_order~genotyper)+
-  scale_color_gradient2(high = "red", mid = "grey80", low = "blue", midpoint = 0.5, na.value = "transparent") +
-  labs(x="UMAP 1", y="UMAP 2", color = "Allele \nFrequency")+
-  theme(axis.ticks = element_blank(), axis.text = element_blank())+
-  coord_cartesian(ylim = c(-10,15))
-
-plt_allele_freq <- plt+
-  geom_label(data = allele_label, aes(x=-10,y=14, color = NULL, label = allele), size = 3, hjust = 0)
-
+plt_allele_freq <- plot_allele_frequencies(allele_data = allele_data, gene_select = "A")
 plt_allele_freq
+```
+```{r, fig.width = 12, fig.height = 6}
+plot_allele_frequencies(allele_data = allele_data, gene_select = "DRB1")
 ```
 
 ### Maximum allele
 
 ```{r, fig.width = 12, fig.height = 3, warning = F, message = F}
-# Create tibble of all genotyper and sample combinations
-allele_max_ratio <- allele_data  %>%
-  select(genotyper, cell, gene, allele_order, allele_ratio) %>%
-  # group_by(genotyper, cell, allele_order) %>%  mutate(test = length(allele_order))
-  pivot_wider(names_from = "allele_order", values_from = "allele_ratio", names_prefix = "allele_") %>%
-  rowwise() %>%
-  mutate(max_ratio = max(across(contains("allele_")), na.rm = T)) %>%
-  select(genotyper, cell, gene, max_ratio) %>%
-  filter(gene == gene_select) 
+plot_allele_ratios <- function(allele_data, gene_select){
+  # Create tibble of all genotyper and sample combinations
+  allele_max_ratio <- allele_data  %>%
+    select(genotyper, cell, gene, allele_order, allele_ratio) %>%
+    # group_by(genotyper, cell, allele_order) %>%  mutate(test = length(allele_order))
+    pivot_wider(names_from = "allele_order", values_from = "allele_ratio", names_prefix = "allele_") %>%
+    rowwise() %>%
+    mutate(max_ratio = max(across(contains("allele_")), na.rm = T)) %>%
+    select(genotyper, cell, gene, max_ratio) %>%
+    filter(gene == gene_select) 
+  
+  allele_label <- allele_data %>% select(sample, genotyper, gene, allele) %>% 
+    filter(gene == gene_select) %>% 
+    separate(sample, into = c("sample", NULL), sep = "_", extra = "drop") %>% 
+    distinct() %>% 
+    group_by(sample, genotyper, gene) %>% nest() %>% unnest_wider(data) %>% 
+    mutate(genotyper = reformat_hla_genotyper(genotyper)) %>% 
+    mutate(allele = map_chr(allele, paste, collapse = "\n"))
+  
+  plt_max_allele <- srt %>% 
+    left_join(allele_max_ratio %>% filter(gene == gene_select), by = "cell") %>% 
+    # mutate(genotyper = fct_relevel(genotyper, "invitro")) %>% 
+    mutate(genotyper = reformat_hla_genotyper(genotyper)) %>% 
+    filter(!is.na(genotyper)) %>%
+    ggplot(aes(x = UMAP_1, y = UMAP_2, color = max_ratio)) +
+      geom_point(size = 0.5, alpha = 0.5)+
+      geom_label(data = allele_label, aes(color = NULL, label = allele, x = -Inf, y = -Inf),
+              hjust = -0.1, vjust = -0.1, size = 3, hjust = 0) +
+      theme_bw() +
+      facet_grid(.~genotyper)+
+      scale_color_gradient(high = "red", low = "blue", na.value = "transparent") +
+      labs(x="UMAP 1", y="UMAP 2", color = "Maximum Allele \nFrequency")+
+      theme(axis.ticks = element_blank(), axis.text = element_blank())
+  
+  return(plt_max_allele)
+}
 
-allele_label <- allele_data %>% select(sample, genotyper, gene, allele) %>% 
-  filter(gene == gene_select) %>% 
+plt_max_allele <- plot_allele_ratios(allele_data = allele_data, gene_select = "A")
+plt_max_allele
+```
+```{r, fig.width = 12, fig.height = 3, warning = F, message = F}
+plot_allele_ratios(allele_data = allele_data, gene_select = "DRB1")
+```
+
+```{r, fig.width = 12, fig.height = 3, warning = F, message = F}
+allele_max_ratio <- allele_data  %>%
+    filter(genotyper == "invitro") %>%  
+    select(cell, gene, allele_order, allele_ratio) %>%
+    pivot_wider(names_from = "allele_order", values_from = "allele_ratio", names_prefix = "allele_") %>%
+    rowwise() %>%
+    mutate(max_ratio = max(across(contains("allele_")), na.rm = T)) %>%
+    select(cell, gene, max_ratio)
+  
+allele_label <- allele_data %>%  
+  filter(genotyper == "invitro") %>% 
+  select(sample, gene, allele) %>%
   separate(sample, into = c("sample", NULL), sep = "_", extra = "drop") %>% 
   distinct() %>% 
-  group_by(sample, genotyper, gene) %>% nest() %>% unnest_wider(data) %>% 
-  mutate(genotyper = reformat_hla_genotyper(genotyper)) %>% 
+  group_by(sample, gene) %>% nest() %>% unnest_wider(data) %>% 
   mutate(allele = map_chr(allele, paste, collapse = "\n"))
 
-plt_max_allele <- srt %>% 
-  left_join(allele_max_ratio %>% filter(gene == gene_select), by = "cell") %>% 
+srt %>% 
+  left_join(allele_max_ratio, by = "cell") %>% 
   # mutate(genotyper = fct_relevel(genotyper, "invitro")) %>% 
-  mutate(genotyper = reformat_hla_genotyper(genotyper)) %>% 
-  filter(!is.na(genotyper)) %>%
+  filter(!is.na(max_ratio)) %>%
   ggplot(aes(x = UMAP_1, y = UMAP_2, color = max_ratio)) +
     geom_point(size = 0.5, alpha = 0.5)+
     geom_label(data = allele_label, aes(color = NULL, label = allele, x = -Inf, y = -Inf),
             hjust = -0.1, vjust = -0.1, size = 3, hjust = 0) +
     theme_bw() +
-    facet_grid(.~genotyper)+
+    facet_grid(.~gene)+
     scale_color_gradient(high = "red", low = "blue", na.value = "transparent") +
     labs(x="UMAP 1", y="UMAP 2", color = "Maximum Allele \nFrequency")+
     theme(axis.ticks = element_blank(), axis.text = element_blank())
-
-plt_max_allele 
+```
+```{r, fig.width = 12, fig.height = 8, warning = F, message = F}
+  allele_max_ratio <- allele_data  %>%
+    select(genotyper, cell, gene, allele_order, allele_ratio) %>%
+    # group_by(genotyper, cell, allele_order) %>%  mutate(test = length(allele_order))
+    pivot_wider(names_from = "allele_order", values_from = "allele_ratio", names_prefix = "allele_") %>%
+    rowwise() %>%
+    mutate(max_ratio = max(across(contains("allele_")), na.rm = T)) %>%
+    select(genotyper, cell, gene, max_ratio)
+  
+  allele_label <- allele_data %>% select(sample, genotyper, gene, allele) %>% 
+    separate(sample, into = c("sample", NULL), sep = "_", extra = "drop") %>% 
+    distinct() %>% 
+    group_by(sample, genotyper, gene) %>% nest() %>% unnest_wider(data) %>% 
+    mutate(genotyper = reformat_hla_genotyper(genotyper)) %>% 
+    mutate(allele = map_chr(allele, paste, collapse = "\n"))
+  
+  plt_max_allele_allGenesTypers <- srt %>% 
+    left_join(allele_max_ratio, by = c("cell")) %>% 
+    # mutate(genotyper = fct_relevel(genotyper, "invitro")) %>% 
+    mutate(genotyper = reformat_hla_genotyper(genotyper)) %>% 
+    filter(!is.na(max_ratio)) %>%
+    ggplot(aes(x = UMAP_1, y = UMAP_2, color = max_ratio)) +
+      rasterise(geom_point(size = 0.5, alpha = 0.5), dpi = 300)+
+      geom_label(data = allele_label, aes(color = NULL, label = allele, x = -Inf, y = -Inf),
+              hjust = -0.1, vjust = -0.1, size = 3, hjust = 0) +
+      theme_bw() +
+      facet_grid(genotyper~gene)+
+      scale_color_gradient(high = "red", low = "blue", na.value = "transparent") +
+      labs(x="UMAP 1", y="UMAP 2", color = "Maximum Allele \nFrequency")+
+      theme(axis.ticks = element_blank(), axis.text = element_blank())
+  
+  plt_max_allele_allGenesTypers
 ```
 
 # Meta-analysis approach
@@ -419,83 +502,67 @@ meta_df <- cell_stats %>%
   mutate(data = map(data,function(x) {sc_meta(x)})) %>%
   unnest(data)
 
-write_csv(meta_df, here("7_HLA_ASE/meta_analysis_results.csv"))
+write_csv(meta_df, here("7_HLA_ASE/meta_analysis_results_12.csv"))
 ```
 
 ### Single sample analysis
 
 ```{r, message=F, warning=F}
-meta_df <- read_csv(here("7_HLA_ASE/meta_analysis_results.csv")) 
+meta_df <- read_csv(here("7_HLA_ASE/meta_analysis_results_c12.csv")) 
 meta_df
 ```
-```{r}
-# Single celltype and gene
-cell_select <- "NK"
-plt_meta <- meta_df %>% 
-  filter(sample == samp) %>% 
-  filter(celltype == cell_select, gene == gene_select) %>% 
-  mutate(genotyper = reformat_hla_genotyper(genotyper)) %>% 
+```{r, fig.width=3, fig.height=3}
+plot_meta_odds <- function(df, cell_type, locus){
+  df %>% 
+  filter(celltype == cell_type, gene == locus) %>% 
+  mutate(genotyper = reformat_hla_genotyper(genotyper)) %>%
   ggplot(aes(x = genotyper, y = TE, ymin = lower, ymax = upper))+
   geom_point()+
-  geom_errorbar()+
+  geom_errorbar(width = 0.4)+
   theme_bw()+
   scale_y_continuous(limits = c(0,NA))+
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   labs(y = "Log-Odds ratio of dominant allele", x= NULL)
+}
+
+plt_meta <- meta_df %>% 
+  filter(sample == samp) %>% 
+  plot_meta_odds(cell_type = "cDC", locus = "A")
+
 plt_meta
 ```
-```{r}
+```{r, fig.width=3, fig.height=3}
+meta_df %>% 
+  filter(sample == samp) %>%
+  plot_meta_odds(cell_type = "cDC", locus = "DRB1")
+```
+
+
+```{r, fig.width=3, fig.height=3}
 samples <- unique(meta_df$sample)
 for (i in 1:length(samples)){
 plt_meta <- meta_df %>% 
   filter(sample == samples[i]) %>% 
-  filter(celltype == "CD14 Monocyte", gene == "A") %>% 
-  mutate(genotyper = reformat_hla_genotyper(genotyper)) %>% 
-  ggplot(aes(x = genotyper, y = TE, ymin = lower, ymax = upper))+
-  geom_point()+
-  geom_errorbar()+
-  theme_bw()+
-  scale_y_continuous(limits = c(0,NA))+
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  labs(y = "Log-Odds ratio of dominant allele", x= NULL) +
+  plot_meta_odds(cell_type = "CD14 Monocyte", locus = "A") +
   ggtitle(samples[i])
   print(plt_meta)
 }
 ```
+```{r, fig.width = 12, fig.height = 3, warning = F, message = F}
+plt_meta_allLoci <- meta_df %>% 
+  filter(sample == samp) %>%
+  filter(celltype == "cDC") %>% 
+  mutate(genotyper = reformat_hla_genotyper(genotyper)) %>%
+  ggplot(aes(x = genotyper, y = TE, ymin = lower, ymax = upper))+
+  geom_point()+
+  geom_errorbar(width = 0.4)+
+  facet_grid(.~gene)+
+  theme_bw()+
+  scale_y_continuous(limits = c(0,NA))+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(y = "Log-Odds ratio\nof dominant allele", x= NULL)
 
-
-
-```{r, fig.width = 12, fig.height = 4}
-# All celltypes and genes
-meta_df %>% 
-  mutate(
-    celltype = factor(celltype, levels = c(
-    "cDC", "CD14 Monocyte", "B", "pDC", "CD16 Monocyte", "CD8 T", "CD4 T", "NK"))) %>% 
-  mutate(genotyper = reformat_hla_genotyper(genotyper)) %>% 
-  mutate(gene = reformat_hla_loci(gene)) %>% 
-  ggplot(aes(x = celltype, y = TE, ymin = lower, ymax = upper, fill = celltype))+
-    geom_bar(stat = "identity", position = "dodge", color = "black", size = 0.25)+
-    geom_errorbar(position = position_dodge(0.9), width =0.5)+
-    theme_bw()+
-    facet_grid(gene~genotyper, scales = "free_y")+
-    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-    labs(y = "Log-Odds ratio of dominant allele", x= NULL, fill = "Cell type") +
-    scale_fill_brewer(palette = "Dark2")
-
-meta_df %>% 
-  mutate(
-    celltype = factor(celltype, levels = c(
-    "cDC", "CD14 Monocyte", "B", "pDC", "CD16 Monocyte", "CD8 T", "CD4 T", "NK"))) %>% 
-  mutate(genotyper = reformat_hla_genotyper(genotyper)) %>% 
-  mutate(gene = reformat_hla_loci(gene)) %>% 
-  ggplot(aes(x = genotyper, y = TE, ymin = lower, ymax = upper, fill = celltype))+
-    geom_bar(stat = "identity", position = "dodge", color = "black", size = 0.25)+
-    geom_errorbar(position = position_dodge(0.9), width =0.5)+
-    theme_bw()+
-    facet_grid(gene~celltype, scales = "free_y")+
-    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-    labs(y = "Log-Odds ratio of dominant allele", x= NULL, fill = "Cell type") +
-    scale_fill_brewer(palette = "Dark2")
+plt_meta_allLoci  
 ```
 
 
@@ -503,7 +570,7 @@ meta_df %>%
 ### Multi-sample analysis
 
 ```{r, message = F}
-meta_df <- read_csv(here("7_HLA_ASE/meta_analysis_results.csv")) %>% 
+meta_df <- read_csv(here("7_HLA_ASE/meta_analysis_results_c12.csv")) %>% 
   mutate(genotyper = reformat_hla_genotyper(genotyper),
          celltype = factor(celltype, levels = c(
           "cDC", "CD14 Monocyte", "B", "pDC", "CD16 Monocyte", "CD8 T", "CD4 T", "NK")))
@@ -534,6 +601,22 @@ meta_df %>%
   labs(y = "Log-Odds ratio of dominant allele", x= NULL, fill = "Cell type") +
   scale_fill_brewer(palette = "Dark2")
 ```
+
+```{r}
+ meta_df %>% 
+  filter(sample == samp) %>%
+  filter(celltype == "cDC") %>% 
+  mutate(genotyper = reformat_hla_genotyper(genotyper)) %>%
+  ggplot(aes(x = genotyper, y = TE, ymin = lower, ymax = upper))+
+  geom_point()+
+  geom_errorbar(width = 0.4)+
+  facet_grid(.~gene)+
+  theme_bw()+
+  scale_y_continuous(limits = c(0,NA))+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(y = "Log-Odds ratio\nof dominant allele", x= NULL)
+```
+
 
 ### Correlation analysis
 
@@ -651,7 +734,7 @@ meta_df %>%
     scale_fill_brewer(palette = "Dark2")
 ```
 
-```{r}
+```{r, fig.width = 12, fig.height = 6, warning = F}
 meta_df %>% 
   filter(genotyper == "Ground truth") %>% 
   left_join(
@@ -662,9 +745,11 @@ meta_df %>%
   ) %>% 
   mutate(severity = as.numeric(severity)) %>% 
   ggplot(aes(x = severity, y = TE)) +
-  geom_point() + 
+  # geom_point() + 
+  stat_summary(fun=mean, stat= "point", size = 0.2)+
+  stat_summary(fun.data = mean_se, geom="errorbar", size = 0.2)+
   stat_smooth(method = "lm")+
-  facet_wrap(~celltype)+
+  facet_grid(celltype~gene)+
   theme_bw() 
 ```
 
@@ -783,9 +868,24 @@ plt_fig_supp <- plt_meta_corr_abbrev + facet_grid(accuracy ~ genotyper, margins 
 plt_fig_supp
 ```
 ```{r}
-save_plot(here("figures_pdf/v2/s6_scHLA.pdf"), plt_fig_supp, base_height = 5, base_width = 6)
+save_plot(here("figures_pdf/v2/s8_ASE_correlation.pdf"), plt_fig_supp, base_height = 5, base_width = 6)
 ```
+```{r, fig.height=10, fig.width=12}
+plt_fig_supp_allLoci <- plot_grid(
+  plt_max_allele_allGenesTypers,
+  plt_meta_allLoci,
+  ncol = 1,
+  rel_heights = c(0.8,0.2), 
+  align = "v",
+  axis = "lr",
+  labels = LETTERS[1:2]
+)
 
+plt_fig_supp_allLoci
+```
+```{r}
+save_plot(here("figures_pdf/v2/s7_ASE_allLoci.pdf"), plt_fig_supp_allLoci, base_height = 10, base_width = 12)
+```
 
 # Save all figure objects 
 ```{r}
