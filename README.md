@@ -1,6 +1,8 @@
 # Benchmarking HLA genotype prediction from scRNA data
 
-This repo contains code corresponding to the manuscript ["Prediction of HLA genotypes from single-cell transcription data"](https://www.biorxiv.org/content/10.1101/2022.06.09.495569v1)
+This repository contains code corresponding to the manuscript ["Prediction of HLA genotypes from single-cell transcription data"](https://www.biorxiv.org/content/10.1101/2022.06.09.495569v1)
+
+An R-package containing implementations of the models in this repository is available at https://github.com/BenSolomon/hlatools
 
 ### Abstract 
 
@@ -19,7 +21,8 @@ This repo contains code corresponding to the manuscript ["Prediction of HLA geno
 - We include two models in this project:
   - `model_HLAD_DRB_kNN` - A kNN model that predicts copy numbers of the HLA-DRB345 locus
   - `model_genotype_composite` - A decision tree model that determines the most accurate HLA genotype when presented outputs from arcasHLA, OptiType, PHLAT, and HLAminer.
-- Both directories contain example data and an R notebook that shows how each model can be applied to this data. 
+- Both directories contain example data and an R notebook that shows how each model can be applied to this data.
+- Implementations of these models and their example data is also available in the R-package `hlatools` found at https://github.com/BenSolomon/hlatools
 
 ### Notes on reproducibility
 
